@@ -12,7 +12,11 @@
     <img src="images/background.jpg" alt="Logo" class="logo" />
     <div class="login-card">
       <h2 class="mb-4">Talisay City College</h2>
-      <form method="POST" action="/TCC/BackEnd/auth/login.php" class="w-100">
+      <form
+        method="POST"
+        action="/TCC/BackEnd/auth/login_simple.php"
+        class="w-100"
+      >
         <div class="text-danger mb-3" id="error-message" style="display: none">
           Invalid username or password
         </div>
@@ -43,7 +47,7 @@
           <a href="/forgot-password" class="text-decoration-none small"
             >Forgot Password?</a
           >
-          <a href="/register" class="text-decoration-none small"
+          <a href="/TCC/public/signup.php" class="text-decoration-none small"
             >Create Account</a
           >
         </div>
@@ -54,6 +58,14 @@
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get("error") === "1") {
         document.getElementById("error-message").style.display = "block";
+      }
+      if (urlParams.get("signup") === "success") {
+        // Show success message for signup
+        const successMessage = document.createElement("div");
+        successMessage.className = "alert alert-success mb-3";
+        successMessage.textContent =
+          "Account created successfully! Please login.";
+        document.querySelector(".login-card").prepend(successMessage);
       }
     </script>
   </body>

@@ -12,20 +12,29 @@ class Auth {
     }
 
     public function login($username, $password) {
+        error_log("Login attempt for username: " . $username);
+        
         $sql = "SELECT * FROM users WHERE username = ?";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param("s", $username);
         $stmt->execute();
         $result = $stmt->get_result();
-
+        
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
+            error_log("User found in database");
+            
             if (password_verify($password, $user['password'])) {
+                error_log("Password verified successfully");
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user['role'];
                 return true;
+            } else {
+                error_log("Password verification failed");
             }
+        } else {
+            error_log("No user found with username: " . $username);
         }
         return false;
     }
@@ -45,16 +54,30 @@ class Auth {
 // Only process login if this file is accessed directly
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        error_log("Login POST request received");
+        
+        if (!isset($_POST['username']) || !isset($_POST['password'])) {
+            error_log("Missing username or password in POST data");
+            header("Location: /TCC/public/index.html?error=missing");
+            exit();
+        }
+        
         $auth = new Auth();
         $username = $_POST['username'];
         $password = $_POST['password'];
-
+        
+        error_log("Attempting login for user: " . $username);
+        
         if ($auth->login($username, $password)) {
+            error_log("Login successful, redirecting to home");
             header("Location: /TCC/public/home.php");
         } else {
+            error_log("Login failed, redirecting back to login page");
             header("Location: /TCC/public/index.html?error=1");
         }
         exit();
+    } else {
+        error_log("Non-POST request received");
     }
 }
 ?>
