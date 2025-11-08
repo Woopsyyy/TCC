@@ -15,7 +15,7 @@ $stmt->bind_param("s", $username);
 $stmt->execute();
 $result = $stmt->get_result();
 $row = $result->fetch_assoc();
-$image = $row['image_path'] ?? 'images/sample.jpg';
+$image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
 ?>
 
 <!DOCTYPE html>
