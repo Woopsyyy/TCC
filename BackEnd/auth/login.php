@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../database/db.php';
 
 class Auth {
@@ -40,17 +42,19 @@ class Auth {
     }
 }
 
-// Handle login request
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $auth = new Auth();
-    $username = $_POST['username'];
-    $password = $_POST['password'];
+// Only process login if this file is accessed directly
+if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        $auth = new Auth();
+        $username = $_POST['username'];
+        $password = $_POST['password'];
 
-    if ($auth->login($username, $password)) {
-        header("Location: ../public/home.php");
-    } else {
-        header("Location: ../public/index.html?error=1");
+        if ($auth->login($username, $password)) {
+            header("Location: /TCC/public/home.php");
+        } else {
+            header("Location: /TCC/public/index.html?error=1");
+        }
+        exit();
     }
-    exit();
 }
 ?>

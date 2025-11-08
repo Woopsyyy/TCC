@@ -1,23 +1,21 @@
 <?php
 session_start();
-require_once "../BackEnd/auth/login.php";
 require_once "../BackEnd/database/db.php";
 
-// Check if user is logged in
-Auth::checkAuth();
+// Ensure user is logged in
+if (!isset($_SESSION['username'])) {
+    header('Location: /TCC/public/index.html');
+    exit();
+}
 
 $conn = Database::getInstance()->getConnection();
 $username = $_SESSION['username'];
-$query = "SELECT image_path FROM users WHERE username=?";
-$stmt = $conn->prepare($query);
+$stmt = $conn->prepare("SELECT image_path FROM users WHERE username = ?");
 $stmt->bind_param("s", $username);
 $stmt->execute();
 $result = $stmt->get_result();
 $row = $result->fetch_assoc();
-$image = $row['image_path'];
-
-// Get user's role
-$isAdmin = Auth::isAdmin();
+$image = $row['image_path'] ?? 'images/sample.jpg';
 ?>
 
 <!DOCTYPE html>
@@ -31,10 +29,10 @@ $isAdmin = Auth::isAdmin();
   </head>
   <body>
     <div class="class-id">
-      <img src="images/sample.jpg" alt="Home Background" class="home-bg" />
+      <img src="<?php echo htmlspecialchars($image); ?>" alt="Home Background" class="home-bg" />
       <h1>
         Welcome,
-        <?php echo $username; ?>!
+        <?php echo htmlspecialchars($username); ?>!
       </h1>
     </div>
   </body>
