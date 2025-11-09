@@ -12,6 +12,14 @@ $full_name = $_SESSION['full_name'] ?? $_SESSION['username'];
 
 // default view: records on home
 $view = isset($_GET['view']) ? $_GET['view'] : 'records';
+$conn = Database::getInstance()->getConnection();
+$username = $_SESSION['username'];
+$stmt = $conn->prepare("SELECT image_path FROM users WHERE username = ?");
+$stmt->bind_param("s", $username);
+$stmt->execute();
+$result = $stmt->get_result();
+$row = $result->fetch_assoc();
+$image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
 ?>
 
 <!DOCTYPE html>

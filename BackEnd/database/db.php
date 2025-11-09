@@ -44,6 +44,7 @@ class Database {
             $tempConn->close();
             
             // Now connect to the database
+            // Create connection with database
             $this->conn = new mysqli($this->servername, $this->username, $this->password, $db);
             
             if ($this->conn->connect_error) {
