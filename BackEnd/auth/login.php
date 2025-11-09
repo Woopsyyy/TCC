@@ -29,6 +29,9 @@ class Auth {
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user['role'];
+                // Store full name and image path in session to avoid extra DB queries on each page load
+                $_SESSION['full_name'] = isset($user['full_name']) && !empty($user['full_name']) ? $user['full_name'] : $user['username'];
+                $_SESSION['image_path'] = isset($user['image_path']) && !empty($user['image_path']) ? $user['image_path'] : '/TCC/public/images/sample.jpg';
                 return true;
             } else {
                 error_log("Password verification failed");

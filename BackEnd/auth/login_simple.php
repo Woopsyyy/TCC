@@ -33,7 +33,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'];
-            
+            // store display name and image in session to avoid DB query on each page
+            $_SESSION['full_name'] = $user['full_name'] ?? $user['username'];
+            $_SESSION['image_path'] = $user['image_path'] ?? '/TCC/public/images/sample.jpg';
+
             error_log("Session variables set. Role: " . $user['role']);
             header("Location: /TCC/public/home.php");
             exit();
