@@ -1,8 +1,11 @@
 <?php
 session_start();
-require_once 'db.php';
+require_once __DIR__ . '/database/db.php';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $db = Database::getInstance();
+    $conn = $db->getConnection();
+    
     $username = mysqli_real_escape_string($conn, $_POST['username']);
     $password = $_POST['password'];
 

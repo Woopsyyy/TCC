@@ -10,6 +10,10 @@ body {
   margin: 0;
   padding: 0;
   background-color: var(--color-ethereal);
+  background-image: url("../images/home-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial;
 }
@@ -105,8 +109,13 @@ body {
 
 .sidebar-bottom {
   margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
 }
 
+.admin-icon,
 .logout-icon {
   color: var(--color-ethereal);
   font-size: 1.2rem;
@@ -119,6 +128,17 @@ body {
   text-decoration: none;
   background: transparent;
   border: none;
+  transition: all 0.2s ease;
+}
+
+.admin-icon:hover {
+  background: rgba(132, 129, 112, 0.2);
+  color: var(--color-flora);
+  transform: scale(1.05);
+}
+
+.logout-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* Main content area */
@@ -164,12 +184,394 @@ body {
   margin-top: 8px;
 }
 
-/* settings form tweaks */
-.profile-preview {
-  width: 96px;
-  height: 96px;
-  border-radius: 12px;
+/* Settings Page Styles */
+.settings-profile-section {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.profile-image-container {
+  display: flex;
+  justify-content: center;
+}
+
+.profile-image-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.profile-preview-large {
+  width: 160px;
+  height: 160px;
+  border-radius: 16px;
   object-fit: cover;
+  border: 3px solid var(--color-ethereal);
+  box-shadow: 0 4px 12px rgba(47, 41, 38, 0.1);
+  display: block;
+}
+
+.profile-upload-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(47, 41, 38, 0.85);
+  color: white;
+  padding: 8px;
+  text-align: center;
+  border-radius: 0 0 16px 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.profile-upload-label:hover {
+  background: rgba(47, 41, 38, 0.95);
+}
+
+.profile-upload-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settings-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-label {
+  font-weight: 600;
+  color: var(--color-bark);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-label i {
+  color: var(--color-flora);
+  font-size: 1.1rem;
+}
+
+.settings-input {
+  padding: 12px 16px;
+  border: 2px solid var(--color-ethereal);
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: var(--color-flora);
+  box-shadow: 0 0 0 3px rgba(132, 129, 112, 0.1);
+}
+
+.settings-hint {
+  color: var(--color-cliff);
+  font-size: 0.875rem;
+  margin-top: -4px;
+}
+
+.settings-feedback {
+  font-size: 0.875rem;
+  margin-top: 4px;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 24px;
+  border-top: 2px solid var(--color-ethereal);
+}
+
+.settings-save-btn {
+  padding: 12px 24px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+/* Responsive settings */
+@media (max-width: 768px) {
+  .settings-profile-section {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  
+  .profile-image-container {
+    justify-content: center;
+  }
+  
+  .settings-actions {
+    flex-direction: column;
+  }
+  
+  .settings-save-btn {
+    width: 100%;
+  }
+}
+
+/* Records View - Modern Redesign */
+.records-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.records-header {
+  margin-bottom: 32px;
+}
+
+.records-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-bark);
+  margin: 0 0 8px 0;
+}
+
+.records-subtitle {
+  color: var(--color-cliff);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.records-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.records-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.info-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 4px 20px rgba(47, 41, 38, 0.08);
+  border: 1px solid rgba(47, 41, 38, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(47, 41, 38, 0.12);
+}
+
+.card-header-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--color-ethereal);
+}
+
+.card-header-modern i {
+  font-size: 1.5rem;
+  color: var(--color-flora);
+}
+
+.card-header-modern h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-bark);
+  margin: 0;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--color-ethereal);
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.info-item:hover {
+  background: var(--color-sage);
+}
+
+.info-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-flora);
+  color: white;
+  border-radius: 10px;
+  font-size: 1.25rem;
+}
+
+.info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.info-label {
+  font-size: 0.875rem;
+  color: var(--color-cliff);
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 1rem;
+  color: var(--color-bark);
+  font-weight: 600;
+}
+
+.financial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.financial-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid;
+  transition: all 0.2s ease;
+}
+
+.financial-item.status-success {
+  background: rgba(216, 218, 202, 0.3);
+  border-color: var(--color-ethereal);
+}
+
+.financial-item.status-warning {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.3);
+}
+
+.financial-item:hover {
+  transform: translateX(4px);
+}
+
+.financial-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 1.5rem;
+}
+
+.financial-item.status-success .financial-icon {
+  background: var(--color-ethereal);
+  color: var(--color-flora);
+}
+
+.financial-item.status-warning .financial-icon {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ff9800;
+}
+
+.financial-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.financial-label {
+  font-size: 0.875rem;
+  color: var(--color-cliff);
+  font-weight: 500;
+}
+
+.financial-value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-bark);
+}
+
+.financial-item.status-success .financial-value {
+  color: var(--color-flora);
+}
+
+.financial-item.status-warning .financial-value {
+  color: #d32f2f;
+}
+
+.days-remaining {
+  color: #ff9800;
+  font-weight: 700;
+}
+
+.info-source {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--color-ethereal);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.info-source i {
+  margin-right: 6px;
+}
+
+/* Announcements and Transparency views */
+.container .card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(47, 41, 38, 0.06);
+  box-shadow: 0 4px 20px rgba(47, 41, 38, 0.08);
+}
+
+.card-title {
+  color: var(--color-bark);
+  font-weight: 600;
+}
+
+.list-group-item {
+  border: none;
+  border-bottom: 1px solid var(--color-ethereal);
+  padding: 16px;
+  transition: background 0.2s ease;
+}
+
+.list-group-item:hover {
+  background: var(--color-ethereal);
+}
+
+.list-group-item:last-child {
+  border-bottom: none;
 }
 
 /* Responsive tweaks */
@@ -189,5 +591,22 @@ body {
   }
   .home-main {
     padding: 16px;
+  }
+  
+  .records-container {
+    padding: 16px;
+  }
+  
+  .records-title {
+    font-size: 1.5rem;
+  }
+  
+  .info-grid,
+  .financial-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-card {
+    padding: 20px;
   }
 }

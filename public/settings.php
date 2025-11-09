@@ -7,62 +7,141 @@ if (!isset($_SESSION['username'])) {
 $image = $_SESSION['image_path'] ?? '/TCC/public/images/sample.jpg';
 $full_name = $_SESSION['full_name'] ?? $_SESSION['username'];
 ?>
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="css/home.css" />
     <title>Settings</title>
-    <style>
-      .profile-preview { width:96px; height:96px; border-radius:12px; object-fit:cover; }
-    </style>
   </head>
   <body>
-    <div class="container py-4">
-      <h4>Account Settings</h4>
-      <?php if (isset($_GET['success'])): ?>
-        <div class="alert alert-success">Profile updated successfully.</div>
-      <?php elseif (isset($_GET['error'])): ?>
-        <div class="alert alert-danger">An error occurred: <?php echo htmlspecialchars($_GET['error']); ?></div>
-      <?php endif; ?>
+    <div class="page-container">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <img src="<?php echo htmlspecialchars($image); ?>" alt="User" class="sidebar-logo" />
+        </div>
 
-      <form id="settingsForm" action="/TCC/BackEnd/auth/update_profile.php" method="post" enctype="multipart/form-data">
-        <div class="row g-3">
-          <div class="col-md-4 text-center">
-            <img id="preview" src="<?php echo htmlspecialchars($image); ?>" class="profile-preview mb-2" alt="profile" />
-            <div>
-              <input type="file" name="profile_image" id="profile_image" accept="image/*" class="form-control form-control-sm" />
-            </div>
+        <nav class="sidebar-nav" aria-label="Main navigation">
+          <ul>
+            <li>
+              <a href="/TCC/public/home.php?view=announcements" class="nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Announcements">
+                <i class="bi bi-megaphone-fill"></i>
+                <span class="nav-label">Announcements</span>
+              </a>
+            </li>
+            <li>
+              <a href="/TCC/public/home.php?view=records" class="nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Records">
+                <i class="bi bi-journal-text"></i>
+                <span class="nav-label">Records</span>
+              </a>
+            </li>
+            <li>
+              <a href="/TCC/public/home.php?view=transparency" class="nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Transparency">
+                <i class="bi bi-graph-up"></i>
+                <span class="nav-label">Transparency</span>
+              </a>
+            </li>
+            <li>
+              <a href="/TCC/public/settings.php" class="nav-link active" data-bs-toggle="tooltip" data-bs-placement="right" title="Settings">
+                <i class="bi bi-gear-fill"></i>
+                <span class="nav-label">Settings</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+            <a href="/TCC/public/admin_dashboard.php" class="btn admin-icon" title="Admin Dashboard" data-bs-toggle="tooltip" data-bs-placement="right">
+              <i class="bi bi-shield-check"></i>
+            </a>
+          <?php endif; ?>
+          <a href="/TCC/BackEnd/auth/logout.php" class="btn logout-icon" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+      </aside>
+
+      <main class="home-main">
+        <div class="records-container">
+          <div class="records-header">
+            <h2 class="records-title">
+              <i class="bi bi-gear-fill"></i> Settings
+            </h2>
+            <p class="records-subtitle">Manage your account preferences and profile information</p>
           </div>
 
-          <div class="col-md-8">
-            <div class="mb-3">
-              <label for="username" class="form-label">Username</label>
-              <input id="username" name="username" class="form-control" value="<?php echo htmlspecialchars($_SESSION['username']); ?>" required />
-              <div id="usernameFeedback" class="form-text text-danger" style="display:none"></div>
+          <?php if (isset($_GET['success'])): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+              <i class="bi bi-check-circle me-2"></i>Profile updated successfully.
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          <?php elseif (isset($_GET['error'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              <i class="bi bi-exclamation-triangle me-2"></i>An error occurred: <?php echo htmlspecialchars($_GET['error']); ?>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          <?php endif; ?>
+
+          <div class="info-card">
+            <div class="card-header-modern">
+              <i class="bi bi-person-circle"></i>
+              <h3>Profile Information</h3>
             </div>
 
-            <div class="mb-3">
-              <label for="full_name" class="form-label">Full Name</label>
-              <input id="full_name" name="full_name" class="form-control" value="<?php echo htmlspecialchars($full_name); ?>" required />
-              <div id="fullnameFeedback" class="form-text text-danger" style="display:none"></div>
-            </div>
+            <form id="settingsForm" action="/TCC/BackEnd/auth/update_profile.php" method="post" enctype="multipart/form-data">
+              <div class="settings-profile-section">
+                <div class="profile-image-container">
+                  <div class="profile-image-wrapper">
+                    <img id="preview" src="<?php echo htmlspecialchars($image); ?>" class="profile-preview-large" alt="Profile" />
+                    <label for="profile_image" class="profile-upload-label">
+                      <i class="bi bi-camera-fill"></i>
+                      <span>Change Photo</span>
+                    </label>
+                    <input type="file" name="profile_image" id="profile_image" accept="image/*" class="profile-upload-input" />
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label for="password" class="form-label">New Password (leave blank to keep current)</label>
-              <input id="password" name="password" type="password" class="form-control" />
-            </div>
+                <div class="settings-form-fields">
+                  <div class="settings-field">
+                    <label for="username" class="settings-label">
+                      <i class="bi bi-person"></i> Username
+                    </label>
+                    <input id="username" name="username" class="settings-input" value="<?php echo htmlspecialchars($_SESSION['username']); ?>" required />
+                    <div id="usernameFeedback" class="settings-feedback text-danger" style="display:none"></div>
+                  </div>
 
-            <div>
-              <button class="btn btn-primary" type="submit">Save changes</button>
-              <a href="/TCC/public/home.php" class="btn btn-outline-secondary ms-2">Back</a>
-            </div>
+                  <div class="settings-field">
+                    <label for="full_name" class="settings-label">
+                      <i class="bi bi-card-text"></i> Full Name
+                    </label>
+                    <input id="full_name" name="full_name" class="settings-input" value="<?php echo htmlspecialchars($full_name); ?>" required />
+                    <div id="fullnameFeedback" class="settings-feedback text-danger" style="display:none"></div>
+                  </div>
+
+                  <div class="settings-field">
+                    <label for="password" class="settings-label">
+                      <i class="bi bi-lock"></i> New Password
+                    </label>
+                    <input id="password" name="password" type="password" class="settings-input" placeholder="Leave blank to keep current password" />
+                    <small class="settings-hint">Leave blank if you don't want to change your password</small>
+                  </div>
+
+                  <div class="settings-actions">
+                    <button class="btn btn-primary settings-save-btn" type="submit">
+                      <i class="bi bi-check-lg me-2"></i>Save Changes
+                    </button>
+                    <a href="/TCC/public/home.php" class="btn btn-outline-secondary">
+                      <i class="bi bi-arrow-left me-2"></i>Cancel
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
-      </form>
+      </main>
     </div>
 
     <script src="js/bootstrap.bundle.min.js"></script>

@@ -10,14 +10,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     error_log("Login attempt - Username: $username");
     
-    $db = Database::getInstance();
-    $conn = $db->getConnection();
-    
-    // First, let's check if we can even find the user
-    $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    try {
+        $db = Database::getInstance();
+        $conn = $db->getConnection();
+        
+        // First, let's check if we can even find the user
+        $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
+        if (!$stmt) {
+            error_log("Failed to prepare statement: " . $conn->error);
+            header("Location: /TCC/public/index.html?error=1&reason=dberror");
+            exit();
+        }
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    } catch (Exception $e) {
+        error_log("Database error during login: " . $e->getMessage());
+        header("Location: /TCC/public/index.html?error=1&reason=dberror");
+        exit();
+    }
     
     if ($result->num_rows === 1) {
         $user = $result->fetch_assoc();

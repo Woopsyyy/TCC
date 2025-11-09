@@ -10,8 +10,8 @@ if (!isset($_SESSION['username'])) {
 $image = $_SESSION['image_path'] ?? '/TCC/public/images/sample.jpg';
 $full_name = $_SESSION['full_name'] ?? $_SESSION['username'];
 
-// default view: announcements on home
-$view = isset($_GET['view']) ? $_GET['view'] : 'announcements';
+// default view: records on home
+$view = isset($_GET['view']) ? $_GET['view'] : 'records';
 ?>
 
 <!DOCTYPE html>
@@ -62,6 +62,11 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'announcements';
         </nav>
 
         <div class="sidebar-bottom">
+          <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+            <a href="/TCC/public/admin_dashboard.php" class="btn admin-icon" title="Admin Dashboard" data-bs-toggle="tooltip" data-bs-placement="right">
+              <i class="bi bi-shield-check"></i>
+            </a>
+          <?php endif; ?>
           <a href="/TCC/BackEnd/auth/logout.php" class="btn logout-icon" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
         </div>
       </aside>
@@ -73,10 +78,19 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'announcements';
 
         if ($view === 'records') {
           ?>
-          <div class="container">
-            <div class="row">
-              <div class="col-lg-8">
-                <div class="card mb-3">
+          <div class="records-container">
+            <div class="records-header">
+              <h2 class="records-title">My Records</h2>
+              <p class="records-subtitle">View your academic and financial information</p>
+            </div>
+            
+            <div class="records-grid">
+              <div class="records-main">
+                <div class="info-card assignment-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-building"></i>
+                    <h3>Assignment Details</h3>
+                  </div>
                   <?php
                   // initialize defaults
                   $buildingText = 'Unassigned';
@@ -89,6 +103,11 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'announcements';
                   try {
                     require_once __DIR__ . '/../BackEnd/database/db.php';
                     $conn = Database::getInstance()->getConnection();
+                    
+                    // Ensure connection is valid
+                    if (!$conn || $conn->connect_error) {
+                      throw new Exception("Database connection failed");
+                    }
 
                     $currentUserId = $_SESSION['user_id'] ?? null;
                     $currentFullName = $_SESSION['full_name'] ?? '';
@@ -340,42 +359,154 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'announcements';
                   }
                   if (!isset($assignment_source)) $assignment_source = 'none';
                   ?>
-                    <div class="row">
-                      <div class="col-md-6">
-                        <p><strong>Building</strong><br /><?php echo htmlspecialchars($buildingText); ?></p>
-                        <p><strong>Floor / Room</strong><br /><?php echo htmlspecialchars($floorText . ' / ' . $roomText); ?></p>
+                  <div class="info-grid">
+                    <div class="info-item">
+                      <div class="info-icon">
+                        <i class="bi bi-building"></i>
                       </div>
-                      <div class="col-md-6">
-                        <p><strong>Year</strong><br /><?php echo htmlspecialchars($yearText); ?></p>
-                        <p><strong>Section</strong><br /><?php echo htmlspecialchars($sectionText); ?></p>
+                      <div class="info-content">
+                        <span class="info-label">Building</span>
+                        <span class="info-value"><?php echo htmlspecialchars($buildingText); ?></span>
                       </div>
                     </div>
-                    <div class="mt-2"><small class="text-muted">Record source: <?php echo htmlspecialchars($assignment_source ?? 'none'); ?><?php if (!empty($matched_key)): ?> — matched: <?php echo htmlspecialchars((string)$matched_key); ?><?php endif; ?></small></div>
-                    <hr />
-                    <div class="row">
-                      <div class="col-md-6">
-                        <p><strong>Outstanding Balance</strong><br /><span class="text-danger">₱2,350.00</span></p>
+                    
+                    <div class="info-item">
+                      <div class="info-icon">
+                        <i class="bi bi-layers"></i>
                       </div>
-                      <div class="col-md-6">
-                        <p><strong>Sanctioned</strong><br />Yes - <span class="text-warning">3</span> days remaining</p>
+                      <div class="info-content">
+                        <span class="info-label">Floor / Room</span>
+                        <span class="info-value"><?php echo htmlspecialchars($floorText . ' / ' . $roomText); ?></span>
+                      </div>
+                    </div>
+                    
+                    <div class="info-item">
+                      <div class="info-icon">
+                        <i class="bi bi-calendar-year"></i>
+                      </div>
+                      <div class="info-content">
+                        <span class="info-label">Year</span>
+                        <span class="info-value"><?php echo htmlspecialchars($yearText); ?></span>
+                      </div>
+                    </div>
+                    
+                    <div class="info-item">
+                      <div class="info-icon">
+                        <i class="bi bi-people"></i>
+                      </div>
+                      <div class="info-content">
+                        <span class="info-label">Section</span>
+                        <span class="info-value"><?php echo htmlspecialchars($sectionText); ?></span>
+                      </div>
+                    </div>
+                  </div>
+                  <?php
+                    // Get payment and sanctions data from userInfo
+                    $owingAmount = $userInfo['owing_amount'] ?? null;
+                    $paymentStatus = $userInfo['payment'] ?? 'paid';
+                    $sanctions = $userInfo['sanctions'] ?? null;
+                    
+                    // Parse sanctions to check for date-based sanctions
+                    $sanctionText = 'No';
+                    $sanctionDays = null;
+                    if (!empty($sanctions)) {
+                      // Try to parse date from sanctions (format: "YYYY-MM-DD" or similar)
+                      if (preg_match('/(\d{4}-\d{2}-\d{2})/', $sanctions, $matches)) {
+                        $sanctionDate = new DateTime($matches[1]);
+                        $now = new DateTime();
+                        if ($sanctionDate > $now) {
+                          $diff = $now->diff($sanctionDate);
+                          $sanctionDays = $diff->days;
+                          $sanctionText = $sanctionDays . ' days';
+                        } else {
+                          $sanctionText = 'Expired';
+                        }
+                      } else {
+                        // If it's a number, treat it as days
+                        if (is_numeric($sanctions)) {
+                          $sanctionDays = intval($sanctions);
+                          $sanctionText = $sanctionDays . ' days';
+                        } else {
+                          $sanctionText = !empty($sanctions) ? 'Yes' : 'No';
+                        }
+                      }
+                    }
+                    ?>
+                </div>
+                
+                <div class="info-card financial-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-wallet2"></i>
+                    <h3>Financial Status</h3>
+                  </div>
+                  <div class="financial-grid">
+                    <div class="financial-item <?php echo $paymentStatus === 'owing' ? 'status-warning' : 'status-success'; ?>">
+                      <div class="financial-icon">
+                        <i class="bi <?php echo $paymentStatus === 'owing' ? 'bi-exclamation-triangle' : 'bi-check-circle'; ?>"></i>
+                      </div>
+                      <div class="financial-content">
+                        <span class="financial-label">Outstanding Balance</span>
+                        <span class="financial-value">
+                          <?php if ($paymentStatus === 'owing' && !empty($owingAmount)): ?>
+                            ₱<?php echo htmlspecialchars($owingAmount); ?>
+                          <?php elseif ($paymentStatus === 'owing'): ?>
+                            Amount pending
+                          <?php else: ?>
+                            ₱0.00
+                          <?php endif; ?>
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div class="financial-item <?php echo ($sanctionDays !== null && $sanctionDays > 0) || strpos($sanctionText, 'days') !== false || $sanctionText === 'Yes' ? 'status-warning' : 'status-success'; ?>">
+                      <div class="financial-icon">
+                        <i class="bi <?php echo (($sanctionDays !== null && $sanctionDays > 0) || strpos($sanctionText, 'days') !== false || $sanctionText === 'Yes') ? 'bi-exclamation-triangle' : 'bi-check-circle'; ?>"></i>
+                      </div>
+                      <div class="financial-content">
+                        <span class="financial-label">Sanctioned</span>
+                        <span class="financial-value">
+                          <?php if ($sanctionDays !== null && $sanctionDays > 0): ?>
+                            <span class="days-remaining"><?php echo $sanctionDays; ?></span> days remaining
+                          <?php elseif (strpos($sanctionText, 'days') !== false): ?>
+                            <span class="days-remaining"><?php echo htmlspecialchars($sanctionText); ?></span>
+                          <?php elseif ($sanctionText === 'Expired'): ?>
+                            <span class="text-muted">Sanction expired</span>
+                          <?php elseif ($sanctionText === 'Yes'): ?>
+                            <span class="text-warning"><?php echo htmlspecialchars($sanctionText); ?></span>
+                          <?php else: ?>
+                            <span class="text-success"><?php echo htmlspecialchars($sanctionText); ?></span>
+                          <?php endif; ?>
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                <!-- City weather removed as requested -->
+                
+                <div class="info-source">
+                  <small class="text-muted">
+                    <i class="bi bi-info-circle"></i>
+                    Record source: <?php echo htmlspecialchars($assignment_source ?? 'none'); ?>
+                    <?php if (!empty($matched_key)): ?>
+                      — matched: <?php echo htmlspecialchars((string)$matched_key); ?>
+                    <?php endif; ?>
+                  </small>
+                </div>
               </div>
-
-              <!-- Quick Info removed as requested -->
             </div>
           </div>
           <?php
         } elseif ($view === 'announcements') {
           ?>
-          <div class="container">
-            <div class="card">
-              <div class="card-body">
-                <h5 class="card-title">Announcements</h5>
+          <div class="records-container">
+            <div class="records-header">
+              <h2 class="records-title">Announcements</h2>
+              <p class="records-subtitle">Stay updated with the latest news and information</p>
+            </div>
+            <div class="info-card">
+              <div class="card-header-modern">
+                <i class="bi bi-megaphone-fill"></i>
+                <h3>Latest Updates</h3>
+              </div>
                 <?php
                 // Prefer announcements from DB; fallback to JSON when table missing
                 $annList = [];
@@ -448,14 +579,19 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'announcements';
                 </ul>
               </div>
             </div>
-          </div>
           <?php
         } elseif ($view === 'transparency') {
           ?>
-          <div class="container">
-            <div class="card">
-              <div class="card-body">
-                <h5 class="card-title">Transparency / Projects</h5>
+          <div class="records-container">
+            <div class="records-header">
+              <h2 class="records-title">Transparency / Projects</h2>
+              <p class="records-subtitle">View project budgets and completion status</p>
+            </div>
+            <div class="info-card">
+              <div class="card-header-modern">
+                <i class="bi bi-graph-up"></i>
+                <h3>Project Information</h3>
+              </div>
                 <div class="table-responsive">
                   <?php
                   $pPath = __DIR__ . '/../database/projects.json';
@@ -487,9 +623,7 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'announcements';
                     </tbody>
                   </table>
                 </div>
-              </div>
             </div>
-          </div>
           <?php
         }
         ?>
