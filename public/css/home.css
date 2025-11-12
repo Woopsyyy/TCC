@@ -338,6 +338,9 @@ body {
 
 .records-header {
   margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .records-title {
@@ -345,6 +348,15 @@ body {
   font-weight: 700;
   color: var(--color-bark);
   margin: 0 0 8px 0;
+}
+
+.records-header .d-flex {
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.records-header .btn {
+  align-self: flex-start;
 }
 
 .records-subtitle {
@@ -508,6 +520,13 @@ body {
   flex: 1;
 }
 
+.sanction-note {
+  font-size: 0.85rem;
+  color: var(--color-cliff);
+  display: block;
+  margin-top: 4px;
+}
+
 .financial-label {
   font-size: 0.875rem;
   color: var(--color-cliff);
@@ -595,12 +614,23 @@ body {
   
   .records-container {
     padding: 16px;
+    gap: 16px;
   }
   
   .records-title {
     font-size: 1.5rem;
   }
-  
+
+  .records-header {
+    gap: 12px;
+  }
+
+  .records-header .d-flex {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
   .info-grid,
   .financial-grid {
     grid-template-columns: 1fr;

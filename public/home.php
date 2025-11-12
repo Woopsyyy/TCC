@@ -21,6 +21,17 @@ $stmt->execute();
 $result = $stmt->get_result();
 $row = $result->fetch_assoc();
 $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
+
+function formatOrdinal($number) {
+  $number = intval($number);
+  if ($number <= 0) { return ''; }
+  $suffixes = ['th','st','nd','rd','th','th','th','th','th','th'];
+  $value = $number % 100;
+  if ($value >= 11 && $value <= 13) {
+    return $number . 'th';
+  }
+  return $number . ($suffixes[$number % 10] ?? 'th');
+}
 ?>
 
 <!DOCTYPE html>
@@ -328,9 +339,21 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                         $ps2->execute();
                         $res2 = $ps2->get_result();
                         if ($r2 = $res2->fetch_assoc()) {
-                          $buildingText = 'Building ' . $r2['building'];
-                          $floorText = $r2['floor'] . 'th Floor';
-                          $roomText = 'Room ' . $r2['room'];
+                          if (!empty($r2['building'])) {
+                            $buildingText = 'Building ' . $r2['building'];
+                          } else {
+                            $buildingText = 'Unassigned';
+                          }
+                          if (!empty($r2['floor']) && intval($r2['floor']) > 0) {
+                            $floorText = formatOrdinal($r2['floor']) . ' Floor';
+                          } else {
+                            $floorText = '';
+                          }
+                          if (!empty($r2['room'])) {
+                            $roomText = 'Room ' . $r2['room'];
+                          } else {
+                            $roomText = '';
+                          }
                         }
                         $ps2->close();
                       }
@@ -418,6 +441,7 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                     // Parse sanctions to check for date-based sanctions
                     $sanctionText = 'No';
                     $sanctionDays = null;
+                    $sanctionNote = '';
                     if (!empty($sanctions)) {
                       // Try to parse date from sanctions (format: "YYYY-MM-DD" or similar)
                       if (preg_match('/(\d{4}-\d{2}-\d{2})/', $sanctions, $matches)) {
@@ -436,7 +460,11 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                           $sanctionDays = intval($sanctions);
                           $sanctionText = $sanctionDays . ' days';
                         } else {
-                          $sanctionText = !empty($sanctions) ? 'Yes' : 'No';
+                          $sanctionText = 'Yes';
+                          $sanctionNote = trim((string)$sanctions);
+                          if ($sanctionNote === '') {
+                            $sanctionNote = null;
+                          }
                         }
                       }
                     }
@@ -487,6 +515,9 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                             <span class="days-remaining"><?php echo htmlspecialchars($sanctionText); ?></span>
                           <?php endif; ?>
                         </span>
+                        <?php if (!empty($sanctionNote)): ?>
+                          <span class="sanction-note">Note: <?php echo htmlspecialchars($sanctionNote); ?></span>
+                        <?php endif; ?>
                       </div>
                     </div>
                     <?php endif; ?>
@@ -523,7 +554,19 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                   $gradesStmt->close();
                 }
                 
-                // Also try by username if no grades found by user_id
+                // Try by username if no grades found by user_id
+                if (empty($studentGrades) && !empty($currentUsername)) {
+                  $gradesStmtUser = $conn->prepare("SELECT year, semester, subject, instructor, prelim_grade, midterm_grade, finals_grade FROM student_grades WHERE username = ? ORDER BY year, semester, subject");
+                  $gradesStmtUser->bind_param('s', $currentUsername);
+                  $gradesStmtUser->execute();
+                  $gradesResultUser = $gradesStmtUser->get_result();
+                  while ($gradeRowUser = $gradesResultUser->fetch_assoc()) {
+                    $studentGrades[] = $gradeRowUser;
+                  }
+                  $gradesStmtUser->close();
+                }
+                
+                // Also try by full name if still empty
                 if (empty($studentGrades) && !empty($currentFullName)) {
                   $gradesStmt2 = $conn->prepare("SELECT year, semester, subject, instructor, prelim_grade, midterm_grade, finals_grade FROM student_grades WHERE username = ? OR username LIKE ? ORDER BY year, semester, subject");
                   $likeName = '%' . $currentFullName . '%';
@@ -535,7 +578,7 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                   }
                   $gradesStmt2->close();
                 }
-                
+
                 if (!empty($studentGrades)):
                   // Group by year and semester
                   $gradesByYear = [];
