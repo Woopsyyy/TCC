@@ -340,7 +340,7 @@ function formatOrdinal($number) {
                         $res2 = $ps2->get_result();
                         if ($r2 = $res2->fetch_assoc()) {
                           if (!empty($r2['building'])) {
-                            $buildingText = 'Building ' . $r2['building'];
+                          $buildingText = 'Building ' . $r2['building'];
                           } else {
                             $buildingText = 'Unassigned';
                           }
@@ -350,7 +350,7 @@ function formatOrdinal($number) {
                             $floorText = '';
                           }
                           if (!empty($r2['room'])) {
-                            $roomText = 'Room ' . $r2['room'];
+                          $roomText = 'Room ' . $r2['room'];
                           } else {
                             $roomText = '';
                           }
@@ -569,16 +569,109 @@ function formatOrdinal($number) {
                 }
 
                 if (!empty($studentGrades)):
-                  // Group by year and semester
+                  // Normalize year/semester values to handle legacy and inconsistent data
+                  $normalizeYear = function ($value) {
+                    $raw = trim((string)$value);
+                    if ($raw === '') {
+                      return ['key' => 'unknown', 'label' => 'Year N/A'];
+                    }
+                    if (is_numeric($raw)) {
+                      $num = (int)$raw;
+                      if ($num > 0) {
+                        $ordinal = formatOrdinal($num);
+                        if ($ordinal !== '') {
+                          return ['key' => (string)$num, 'label' => $ordinal . ' Year'];
+                        }
+                      }
+                      return ['key' => (string)$raw, 'label' => trim($raw) . ' Year'];
+                    }
+                    if (preg_match('/(\d+)/', $raw, $matches)) {
+                      $num = (int)$matches[1];
+                      if ($num > 0) {
+                        $ordinal = formatOrdinal($num);
+                        if ($ordinal !== '') {
+                          return ['key' => (string)$num, 'label' => $ordinal . ' Year'];
+                        }
+                      }
+                    }
+                    $lower = strtolower($raw);
+                    $wordMap = [
+                      'first' => 1,
+                      'second' => 2,
+                      'third' => 3,
+                      'fourth' => 4,
+                      '1st' => 1,
+                      '2nd' => 2,
+                      '3rd' => 3,
+                      '4th' => 4,
+                    ];
+                    foreach ($wordMap as $needle => $num) {
+                      if (strpos($lower, $needle) !== false) {
+                        $ordinal = formatOrdinal($num);
+                        if ($ordinal !== '') {
+                          return ['key' => (string)$num, 'label' => $ordinal . ' Year'];
+                        }
+                      }
+                    }
+                    return ['key' => $raw, 'label' => ucfirst($raw)];
+                  };
+
+                  $normalizeSemester = function ($value) {
+                    $raw = trim((string)$value);
+                    if ($raw === '') {
+                      return 'Other Semester';
+                    }
+                    $lower = strtolower($raw);
+                    $firstAliases = ['1', '1st', 'first', 'first semester', 'sem 1', 'semester 1', '1st semester'];
+                    foreach ($firstAliases as $alias) {
+                      if ($lower === $alias) {
+                        return 'First Semester';
+                      }
+                    }
+                    if (strpos($lower, 'first') !== false || strpos($lower, '1st') !== false || strpos($lower, 'sem 1') !== false) {
+                      return 'First Semester';
+                    }
+                    $secondAliases = ['2', '2nd', 'second', 'second semester', 'sem 2', 'semester 2', '2nd semester'];
+                    foreach ($secondAliases as $alias) {
+                      if ($lower === $alias) {
+                        return 'Second Semester';
+                      }
+                    }
+                    if (strpos($lower, 'second') !== false || strpos($lower, '2nd') !== false || strpos($lower, 'sem 2') !== false) {
+                      return 'Second Semester';
+                    }
+                    return ucwords($raw);
+                  };
+
+                  // Group by normalized year and semester
                   $gradesByYear = [];
                   foreach ($studentGrades as $grade) {
-                    $year = $grade['year'];
-                    $semester = $grade['semester'];
-                    if (!isset($gradesByYear[$year])) {
-                      $gradesByYear[$year] = ['First Semester' => [], 'Second Semester' => []];
+                    $yearInfo = $normalizeYear($grade['year'] ?? '');
+                    $yearKey = $yearInfo['key'];
+                    $yearLabel = $yearInfo['label'];
+                    if (!isset($gradesByYear[$yearKey])) {
+                      $gradesByYear[$yearKey] = [
+                        'label' => $yearLabel,
+                        'semesters' => []
+                      ];
                     }
-                    $gradesByYear[$year][$semester][] = $grade;
+                    $semesterLabel = $normalizeSemester($grade['semester'] ?? '');
+                    if (!isset($gradesByYear[$yearKey]['semesters'][$semesterLabel])) {
+                      $gradesByYear[$yearKey]['semesters'][$semesterLabel] = [];
+                    }
+                    $gradesByYear[$yearKey]['semesters'][$semesterLabel][] = $grade;
                   }
+
+                  // Keep standard years in a predictable order, append the rest afterwards
+                  $preferredYearOrder = ['1', '2', '3', '4'];
+                  $orderedYears = [];
+                  foreach ($preferredYearOrder as $yearKey) {
+                    if (isset($gradesByYear[$yearKey])) {
+                      $orderedYears[$yearKey] = $gradesByYear[$yearKey];
+                      unset($gradesByYear[$yearKey]);
+                    }
+                  }
+                  $gradesByYear = $orderedYears + $gradesByYear;
               ?>
               <div class="info-card mt-3">
                 <div class="card-header-modern">
@@ -586,16 +679,28 @@ function formatOrdinal($number) {
                   <h3>My Grades</h3>
                 </div>
                 
-                <?php foreach ($gradesByYear as $yearNum => $semesters): ?>
+                <?php foreach ($gradesByYear as $yearData): ?>
+                  <?php
+                    $semesters = $yearData['semesters'];
+                    $preferredSemesters = ['First Semester', 'Second Semester'];
+                    $orderedSemesters = [];
+                    foreach ($preferredSemesters as $semName) {
+                      if (!empty($semesters[$semName])) {
+                        $orderedSemesters[$semName] = $semesters[$semName];
+                        unset($semesters[$semName]);
+                      }
+                    }
+                    $orderedSemesters = $orderedSemesters + $semesters;
+                  ?>
                   <div class="mb-4">
-                    <h4 class="grade-semester-title"><?php echo $yearNum; ?><?php echo $yearNum == '1' ? 'st' : ($yearNum == '2' ? 'nd' : ($yearNum == '3' ? 'rd' : 'th')); ?> Year</h4>
+                    <h4 class="grade-semester-title"><?php echo htmlspecialchars($yearData['label']); ?></h4>
                     
-                    <?php foreach (['First Semester', 'Second Semester'] as $semName): ?>
-                      <?php if (!empty($semesters[$semName])): ?>
+                    <?php foreach ($orderedSemesters as $semName => $gradesList): ?>
+                      <?php if (!empty($gradesList)): ?>
                         <div class="mb-3">
-                          <h5 style="font-size: 1rem; font-weight: 600; color: var(--color-bark); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--color-ethereal);"><?php echo $semName; ?></h5>
+                          <h5 style="font-size: 1rem; font-weight: 600; color: var(--color-bark); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--color-ethereal);"><?php echo htmlspecialchars($semName); ?></h5>
                           <div class="grade-cards-container">
-                            <?php foreach ($semesters[$semName] as $grade): ?>
+                            <?php foreach ($gradesList as $grade): ?>
                               <div class="grade-card">
                                 <div class="grade-card-header">
                                   <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
@@ -621,7 +726,7 @@ function formatOrdinal($number) {
                             <?php endforeach; ?>
                           </div>
                         </div>
-                      <?php endif; ?>
+                    <?php endif; ?>
                     <?php endforeach; ?>
                   </div>
                 <?php endforeach; ?>
