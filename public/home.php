@@ -524,19 +524,8 @@ function formatOrdinal($number) {
                   </div>
                 </div>
                 
-                <div class="info-source">
-                  <small class="text-muted">
-                    <i class="bi bi-info-circle"></i>
-                    Record source: <?php echo htmlspecialchars($assignment_source ?? 'none'); ?>
-                    <?php if (!empty($matched_key)): ?>
-                      — matched: <?php echo htmlspecialchars((string)$matched_key); ?>
-                    <?php endif; ?>
-                  </small>
-                </div>
-              </div>
-              
-              <!-- Student Grades Display -->
-              <?php
+                <!-- Student Grades Display -->
+                <?php
               try {
                 $currentUserId = $_SESSION['user_id'] ?? null;
                 $currentUsername = $_SESSION['username'] ?? '';

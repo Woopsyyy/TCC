@@ -893,16 +893,14 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             <?php endif; ?>
  
             <!-- Display Grades by Year -->
-            <div class="grade-system-wrapper">
             <?php
             $years = ['1', '2', '3', '4'];
             foreach ($years as $yearNum):
-              // Get grades for this year, optionally filtered by student
               if ($selectedStudentId) {
-                $gradesQuery = $conn->prepare("SELECT sg.*, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id WHERE sg.year = ? AND sg.user_id = ? ORDER BY sg.semester, sg.subject");
+                $gradesQuery = $conn->prepare("SELECT sg.*, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id WHERE sg.year = ? AND sg.user_id = ? ORDER BY sg.user_id, sg.username, sg.semester, sg.subject");
                 $gradesQuery->bind_param('si', $yearNum, $selectedStudentId);
               } else {
-                $gradesQuery = $conn->prepare("SELECT sg.*, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id WHERE sg.year = ? ORDER BY sg.semester, sg.subject");
+                $gradesQuery = $conn->prepare("SELECT sg.*, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id WHERE sg.year = ? ORDER BY sg.user_id, sg.username, sg.semester, sg.subject");
                 $gradesQuery->bind_param('s', $yearNum);
               }
               $gradesQuery->execute();
@@ -912,21 +910,32 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                 $yearGrades[] = $row;
               }
               $gradesQuery->close();
-              
-              // Skip this year if no grades and student is filtered
-              if ($selectedStudentId && empty($yearGrades)) {
+
+              if (empty($yearGrades)) {
                 continue;
               }
-              
-              // Group by semester
-              $firstSemester = [];
-              $secondSemester = [];
+
+              $studentGroups = [];
               foreach ($yearGrades as $grade) {
-                if ($grade['semester'] === 'First Semester') {
-                  $firstSemester[] = $grade;
-                } else {
-                  $secondSemester[] = $grade;
+                $studentId = !empty($grade['user_id']) ? (int)$grade['user_id'] : null;
+                $studentIdentifier = $studentId !== null ? 'id_' . $studentId : 'name_' . strtolower(trim($grade['username'] ?? $grade['full_name'] ?? uniqid()));
+                $displayName = $grade['full_name'] ?? $grade['username'] ?? 'Unnamed Student';
+                if (!isset($studentGroups[$studentIdentifier])) {
+                  $studentGroups[$studentIdentifier] = [
+                    'user_id' => $studentId,
+                    'display' => $displayName,
+                    'semesters' => [
+                      'First Semester' => [],
+                      'Second Semester' => []
+                    ]
+                  ];
                 }
+                $semesterKey = ($grade['semester'] === 'Second Semester') ? 'Second Semester' : 'First Semester';
+                $studentGroups[$studentIdentifier]['semesters'][$semesterKey][] = $grade;
+              }
+
+              if (empty($studentGroups)) {
+                continue;
               }
             ?>
             <div class="grade-year-card">
@@ -939,125 +948,76 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                 <i class="bi bi-chevron-down"></i>
               </button>
               <div id="<?php echo $collapseId; ?>" class="collapse <?php echo ($selectedStudentId || $yearNum === '1') ? 'show' : ''; ?> grade-year-body">
-                <!-- First Semester -->
-                <?php if (!empty($firstSemester)): ?>
-                  <div class="mb-4">
-                    <h4 class="grade-semester-title">First Semester</h4>
-                    <div class="grade-cards-container">
-                      <?php foreach ($firstSemester as $grade): ?>
-                        <div class="grade-card">
-                          <div class="grade-card-header">
-                            <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
-                            <?php if (!$selectedStudentId): ?>
-                              <?php
-                                $studentFilterId = !empty($grade['user_id']) ? (int)$grade['user_id'] : null;
-                                $studentNameForFilter = !empty($grade['full_name']) ? $grade['full_name'] : ($grade['username'] ?? '');
-                              ?>
-                              <?php if ($studentFilterId): ?>
-                                <a href="/TCC/public/admin_dashboard.php?section=grade_system&student_id=<?php echo $studentFilterId; ?>" class="grade-student-link">
-                                  <i class="bi bi-person"></i> <?php echo htmlspecialchars($studentNameForFilter); ?>
-                                </a>
-                              <?php elseif (!empty($studentNameForFilter)): ?>
-                                <span class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($studentNameForFilter); ?></span>
-                              <?php endif; ?>
-                            <?php endif; ?>
-                            <?php if (!empty($grade['instructor'])): ?>
-                              <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
-                            <?php endif; ?>
-                          </div>
-                          <div class="grade-details">
-                            <div class="grade-item">
-                              <span class="grade-label">Prelim</span>
-                              <span class="grade-value"><?php echo $grade['prelim_grade'] !== null ? htmlspecialchars($grade['prelim_grade']) : '-'; ?></span>
+                <div class="grade-student-list">
+                  <?php $studentIndex = 0; foreach ($studentGroups as $groupKey => $group): ?>
+                    <?php
+                      $studentCollapseId = 'gradeStudentCollapse' . $yearNum . '_' . $studentIndex;
+                      $shouldOpen = false;
+                      if ($selectedStudentId && $group['user_id'] !== null) {
+                        $shouldOpen = ($group['user_id'] === $selectedStudentId);
+                      } elseif (!$selectedStudentId && $studentIndex === 0) {
+                        $shouldOpen = true;
+                      }
+                    ?>
+                    <div class="student-grade-card">
+                      <button class="student-grade-header" type="button" data-bs-toggle="collapse" data-bs-target="#<?php echo $studentCollapseId; ?>" aria-expanded="<?php echo $shouldOpen ? 'true' : 'false'; ?>" aria-controls="<?php echo $studentCollapseId; ?>">
+                        <span><i class="bi bi-person-vcard"></i> <?php echo htmlspecialchars($group['display']); ?></span>
+                        <i class="bi bi-chevron-down"></i>
+                      </button>
+                      <div id="<?php echo $studentCollapseId; ?>" class="collapse student-grade-body <?php echo $shouldOpen ? 'show' : ''; ?>">
+                        <?php $hasGrades = false; ?>
+                        <?php foreach (['First Semester', 'Second Semester'] as $semName): ?>
+                          <?php if (!empty($group['semesters'][$semName])): $hasGrades = true; ?>
+                            <div class="mb-4">
+                              <h4 class="grade-semester-title"><?php echo $semName; ?></h4>
+                              <div class="grade-cards-container">
+                                <?php foreach ($group['semesters'][$semName] as $grade): ?>
+                                  <div class="grade-card">
+                                    <div class="grade-card-header">
+                                      <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
+                                      <?php if (!empty($grade['instructor'])): ?>
+                                        <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
+                                      <?php endif; ?>
+                                    </div>
+                                    <div class="grade-details">
+                                      <div class="grade-item">
+                                        <span class="grade-label">Prelim</span>
+                                        <span class="grade-value"><?php echo $grade['prelim_grade'] !== null ? htmlspecialchars($grade['prelim_grade']) : '-'; ?></span>
+                                      </div>
+                                      <div class="grade-item">
+                                        <span class="grade-label">Midterm</span>
+                                        <span class="grade-value"><?php echo $grade['midterm_grade'] !== null ? htmlspecialchars($grade['midterm_grade']) : '-'; ?></span>
+                                      </div>
+                                      <div class="grade-item">
+                                        <span class="grade-label">Finals</span>
+                                        <span class="grade-value"><?php echo $grade['finals_grade'] !== null ? htmlspecialchars($grade['finals_grade']) : '-'; ?></span>
+                                      </div>
+                                    </div>
+                                    <div class="grade-card-actions">
+                                      <a href="/TCC/public/admin_dashboard.php?section=grade_system&edit_grade_id=<?php echo (int)$grade['id']; ?>" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i> Edit
+                                      </a>
+                                      <form method="post" action="/TCC/BackEnd/admin/manage_grades.php" onsubmit="return confirm('Delete this grade record?');" style="display:inline;">
+                                        <input type="hidden" name="action" value="delete" />
+                                        <input type="hidden" name="id" value="<?php echo (int)$grade['id']; ?>" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">
+                                          <i class="bi bi-trash"></i> Delete
+                                        </button>
+                                      </form>
+                                    </div>
+                                  </div>
+                                <?php endforeach; ?>
+                              </div>
                             </div>
-                            <div class="grade-item">
-                              <span class="grade-label">Midterm</span>
-                              <span class="grade-value"><?php echo $grade['midterm_grade'] !== null ? htmlspecialchars($grade['midterm_grade']) : '-'; ?></span>
-                            </div>
-                            <div class="grade-item">
-                              <span class="grade-label">Finals</span>
-                              <span class="grade-value"><?php echo $grade['finals_grade'] !== null ? htmlspecialchars($grade['finals_grade']) : '-'; ?></span>
-                            </div>
-                          </div>
-                          <div class="grade-card-actions">
-                            <a href="/TCC/public/admin_dashboard.php?section=grade_system&edit_grade_id=<?php echo (int)$grade['id']; ?>" class="btn btn-sm btn-outline-primary">
-                              <i class="bi bi-pencil"></i> Edit
-                            </a>
-                            <form method="post" action="/TCC/BackEnd/admin/manage_grades.php" onsubmit="return confirm('Delete this grade record?');" style="display:inline;">
-                              <input type="hidden" name="action" value="delete" />
-                              <input type="hidden" name="id" value="<?php echo (int)$grade['id']; ?>" />
-                              <button class="btn btn-sm btn-outline-danger" type="submit">
-                                <i class="bi bi-trash"></i> Delete
-                              </button>
-                            </form>
-                          </div>
-                        </div>
-                      <?php endforeach; ?>
+                          <?php endif; ?>
+                        <?php endforeach; ?>
+                        <?php if (!$hasGrades): ?>
+                          <p class="text-muted mb-0">No grade records for this student yet.</p>
+                        <?php endif; ?>
+                      </div>
                     </div>
-                  </div>
-                <?php endif; ?>
-
-                <!-- Second Semester -->
-                <?php if (!empty($secondSemester)): ?>
-                  <div class="mb-4">
-                    <h4 class="grade-semester-title">Second Semester</h4>
-                    <div class="grade-cards-container">
-                      <?php foreach ($secondSemester as $grade): ?>
-                        <div class="grade-card">
-                          <div class="grade-card-header">
-                            <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
-                            <?php if (!$selectedStudentId): ?>
-                              <?php
-                                $studentFilterId = !empty($grade['user_id']) ? (int)$grade['user_id'] : null;
-                                $studentNameForFilter = !empty($grade['full_name']) ? $grade['full_name'] : ($grade['username'] ?? '');
-                              ?>
-                              <?php if ($studentFilterId): ?>
-                                <a href="/TCC/public/admin_dashboard.php?section=grade_system&student_id=<?php echo $studentFilterId; ?>" class="grade-student-link">
-                                  <i class="bi bi-person"></i> <?php echo htmlspecialchars($studentNameForFilter); ?>
-                                </a>
-                              <?php elseif (!empty($studentNameForFilter)): ?>
-                                <span class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($studentNameForFilter); ?></span>
-                              <?php endif; ?>
-                            <?php endif; ?>
-                            <?php if (!empty($grade['instructor'])): ?>
-                              <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
-                            <?php endif; ?>
-                          </div>
-                          <div class="grade-details">
-                            <div class="grade-item">
-                              <span class="grade-label">Prelim</span>
-                              <span class="grade-value"><?php echo $grade['prelim_grade'] !== null ? htmlspecialchars($grade['prelim_grade']) : '-'; ?></span>
-                            </div>
-                            <div class="grade-item">
-                              <span class="grade-label">Midterm</span>
-                              <span class="grade-value"><?php echo $grade['midterm_grade'] !== null ? htmlspecialchars($grade['midterm_grade']) : '-'; ?></span>
-                            </div>
-                            <div class="grade-item">
-                              <span class="grade-label">Finals</span>
-                              <span class="grade-value"><?php echo $grade['finals_grade'] !== null ? htmlspecialchars($grade['finals_grade']) : '-'; ?></span>
-                            </div>
-                          </div>
-                          <div class="grade-card-actions">
-                            <a href="/TCC/public/admin_dashboard.php?section=grade_system&edit_grade_id=<?php echo (int)$grade['id']; ?>" class="btn btn-sm btn-outline-primary">
-                              <i class="bi bi-pencil"></i> Edit
-                            </a>
-                            <form method="post" action="/TCC/BackEnd/admin/manage_grades.php" onsubmit="return confirm('Delete this grade record?');" style="display:inline;">
-                              <input type="hidden" name="action" value="delete" />
-                              <input type="hidden" name="id" value="<?php echo (int)$grade['id']; ?>" />
-                              <button class="btn btn-sm btn-outline-danger" type="submit">
-                                <i class="bi bi-trash"></i> Delete
-                              </button>
-                            </form>
-                          </div>
-                        </div>
-                      <?php endforeach; ?>
-                    </div>
-                  </div>
-                <?php endif; ?>
-
-                <?php if (empty($firstSemester) && empty($secondSemester)): ?>
-                  <p class="text-muted">No grades recorded for <?php echo $yearNum; ?><?php echo $yearNum == '1' ? 'st' : ($yearNum == '2' ? 'nd' : ($yearNum == '3' ? 'rd' : 'th')); ?> Year yet.</p>
-                <?php endif; ?>
+                    <?php $studentIndex++; endforeach; ?>
+                </div>
               </div>
             </div>
             <?php endforeach; ?>
@@ -1101,6 +1061,15 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
         var t=document.querySelectorAll('[data-bs-toggle="tooltip"]');Array.from(t).forEach(el=>new bootstrap.Tooltip(el));
         // Rotate chevron icons on collapse show/hide
         document.querySelectorAll('.grade-year-header').forEach(function(btn){
+          var target = btn.getAttribute('data-bs-target');
+          var collapseEl = document.querySelector(target);
+          if (!collapseEl) return;
+          collapseEl.addEventListener('show.bs.collapse', function(){ btn.classList.add('open'); });
+          collapseEl.addEventListener('hide.bs.collapse', function(){ btn.classList.remove('open'); });
+        });
+
+        // Rotate chevrons for student sections
+        document.querySelectorAll('.student-grade-header').forEach(function(btn){
           var target = btn.getAttribute('data-bs-target');
           var collapseEl = document.querySelector(target);
           if (!collapseEl) return;

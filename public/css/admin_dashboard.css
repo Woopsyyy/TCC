@@ -418,6 +418,50 @@ body.admin-dashboard {
   padding: 20px;
 }
 
+.grade-student-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.student-grade-card {
+  border: 1px solid var(--color-ethereal);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 14px rgba(47, 41, 38, 0.08);
+}
+
+.student-grade-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--color-bark);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.student-grade-header:hover {
+  background: var(--color-ethereal);
+}
+
+.student-grade-header i.bi-chevron-down {
+  transition: transform 0.2s ease;
+}
+
+.student-grade-header.open i.bi-chevron-down {
+  transform: rotate(180deg);
+}
+
+.student-grade-body {
+  padding: 16px 18px 18px;
+}
+
 /* Buildings Grid Layout */
 .buildings-grid {
   display: grid;
@@ -573,6 +617,10 @@ body.admin-dashboard {
 
   .grade-year-body {
     padding: 16px;
+  }
+
+  .student-grade-body {
+    padding: 14px;
   }
 
   /* Grade Cards */
