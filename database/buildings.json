@@ -1,0 +1,18 @@
+{
+    "A": {
+        "floors": 4,
+        "rooms": 4
+    },
+    "B": {
+        "floors": 4,
+        "rooms": 4
+    },
+    "C": {
+        "floors": 4,
+        "rooms": 4
+    },
+    "D": {
+        "floors": 4,
+        "rooms": 4
+    }
+}
