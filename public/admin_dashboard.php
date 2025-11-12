@@ -893,6 +893,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             <?php endif; ?>
  
             <!-- Display Grades by Year -->
+            <div class="grade-system-wrapper">
             <?php
             $years = ['1', '2', '3', '4'];
             foreach ($years as $yearNum):
