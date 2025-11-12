@@ -91,6 +91,40 @@ class Database {
         if ($result->num_rows == 0) {
             error_log("Tables do not exist. Creating all tables automatically...");
             $this->createAllTables();
+        } else {
+            // Check if student_grades table exists, create it if missing
+            $gradesCheck = $this->conn->query("SHOW TABLES LIKE 'student_grades'");
+            if ($gradesCheck->num_rows == 0) {
+                error_log("student_grades table missing. Creating it...");
+                $this->createStudentGradesTable();
+            }
+        }
+    }
+    
+    private function createStudentGradesTable() {
+        $query = "CREATE TABLE IF NOT EXISTS student_grades (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT DEFAULT NULL,
+            username VARCHAR(200) NOT NULL,
+            year VARCHAR(10) NOT NULL,
+            semester VARCHAR(20) NOT NULL,
+            subject VARCHAR(255) NOT NULL,
+            instructor VARCHAR(255) DEFAULT NULL,
+            prelim_grade DECIMAL(5,2) DEFAULT NULL,
+            midterm_grade DECIMAL(5,2) DEFAULT NULL,
+            finals_grade DECIMAL(5,2) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_user_id (user_id),
+            INDEX idx_username (username),
+            INDEX idx_year_semester (year, semester),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        
+        if (!$this->conn->query($query)) {
+            error_log("Error creating student_grades table: " . $this->conn->error);
+        } else {
+            error_log("student_grades table created successfully");
         }
     }
     

@@ -467,9 +467,10 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                       </div>
                     </div>
                     
-                    <div class="financial-item <?php echo ($sanctionDays !== null && $sanctionDays > 0) || strpos($sanctionText, 'days') !== false || $sanctionText === 'Yes' ? 'status-warning' : 'status-success'; ?>">
+                    <?php if (($sanctionDays !== null && $sanctionDays > 0) || strpos($sanctionText, 'days') !== false || $sanctionText === 'Yes' || $sanctionText === 'Expired'): ?>
+                    <div class="financial-item status-warning">
                       <div class="financial-icon">
-                        <i class="bi <?php echo (($sanctionDays !== null && $sanctionDays > 0) || strpos($sanctionText, 'days') !== false || $sanctionText === 'Yes') ? 'bi-exclamation-triangle' : 'bi-check-circle'; ?>"></i>
+                        <i class="bi bi-exclamation-triangle"></i>
                       </div>
                       <div class="financial-content">
                         <span class="financial-label">Sanctioned</span>
@@ -480,14 +481,13 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                             <span class="days-remaining"><?php echo htmlspecialchars($sanctionText); ?></span>
                           <?php elseif ($sanctionText === 'Expired'): ?>
                             <span class="text-muted">Sanction expired</span>
-                          <?php elseif ($sanctionText === 'Yes'): ?>
-                            <span class="text-warning"><?php echo htmlspecialchars($sanctionText); ?></span>
                           <?php else: ?>
-                            <span class="text-success"><?php echo htmlspecialchars($sanctionText); ?></span>
+                            <span class="text-warning"><?php echo htmlspecialchars($sanctionText); ?></span>
                           <?php endif; ?>
                         </span>
                       </div>
                     </div>
+                    <?php endif; ?>
                   </div>
                 </div>
                 

@@ -14,7 +14,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <link rel="stylesheet" href="css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="css/home.css" />
@@ -295,32 +295,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
               }
             }
             ?>
-            <div class="info-card">
-              <div class="card-header-modern">
-                <i class="bi bi-building"></i>
-                <h3>Manage Buildings & Rooms</h3>
-              </div>
-              <div class="card-body p-3">
-                <form class="row g-3 align-items-end" action="/TCC/BackEnd/admin/manage_buildings.php" method="post">
-                  <div class="col-md-3">
-                    <label class="form-label fw-bold">Building</label>
-                    <input name="building" class="form-control" placeholder="A" required/>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label fw-bold">Floors</label>
-                    <input name="floors" type="number" class="form-control" value="4" min="1" required/>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label fw-bold">Rooms per floor</label>
-                    <input name="rooms" type="number" class="form-control" value="4" min="1" required/>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label d-block">&nbsp;</label>
-                    <button class="btn btn-primary w-100">Save Building</button>
-                  </div>
-                </form>
-              </div>
-            </div>
+            <div class="buildings-grid">
             <?php
             // paginate buildings (convert assoc -> list of entries)
             $bldPerPage = 5;
@@ -331,7 +306,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             $bldTotalPages = max(1, intval(ceil($bldTotal / $bldPerPage)));
             $bldSlice = array_slice($bEntries, ($bldPage-1)*$bldPerPage, $bldPerPage);
             ?>
-            <div class="info-card mt-3">
+            <div class="info-card buildings-card">
               <div class="card-header-modern">
                 <i class="bi bi-building-check"></i>
                 <h3>Configured Buildings</h3>
@@ -343,213 +318,6 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                   <?php endforeach; ?>
                 </ul>
               </div>
-
-              <?php if ($bldTotalPages > 1): ?>
-              <nav class="mt-2" aria-label="Buildings pages">
-                <ul class="pagination pagination-sm">
-                  <?php
-                  $baseParams = $_GET; unset($baseParams['bld_page']);
-                  $prevPage = max(1, $bldPage-1); $nextPage = min($bldTotalPages, $bldPage+1);
-                  $prevClass = ($bldPage <= 1) ? 'disabled' : '';
-                  $nextClass = ($bldPage >= $bldTotalPages) ? 'disabled' : '';
-                  $baseParams['bld_page'] = $prevPage; echo '<li class="page-item ' . $prevClass . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($baseParams)) . '" aria-label="Previous buildings page">&lt;</a></li>';
-                  $showPages = min(5, $bldTotalPages);
-                  for ($p = 1; $p <= $showPages; $p++) { $baseParams['bld_page'] = $p; $qstr = htmlspecialchars(http_build_query($baseParams)); $isActive = ($p === $bldPage); $active = $isActive ? ' active' : ''; $aria = $isActive ? ' aria-current="page"' : ''; echo '<li class="page-item' . $active . '"><a class="page-link" href="?' . $qstr . '" aria-label="Buildings page ' . $p . '"' . $aria . '>' . $p . '</a></li>'; }
-                  $baseParams['bld_page'] = $nextPage; echo '<li class="page-item ' . $nextClass . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($baseParams)) . '" aria-label="Next buildings page">&gt;</a></li>';
-                  ?>
-                </ul>
-              </nav>
-              <?php endif; ?>
-            </div>
-            
-            <!-- Assign Building & Room to Available Sections -->
-            <?php
-            // Get all unique sections from user_assignments
-            $availableSections = [];
-            try {
-              $connSections = Database::getInstance()->getConnection();
-              $sectionsQuery = $connSections->query("SELECT DISTINCT year, section FROM user_assignments ORDER BY year, section");
-              if ($sectionsQuery) {
-                while ($row = $sectionsQuery->fetch_assoc()) {
-                  $availableSections[] = $row;
-                }
-              }
-              
-              // Get existing section assignments to show which are already assigned
-              $existingAssignments = [];
-              $existingQuery = $connSections->query("SELECT id, year, section, building, floor, room FROM section_assignments");
-              if ($existingQuery) {
-                while ($row = $existingQuery->fetch_assoc()) {
-                  $key = $row['year'] . '|' . $row['section'];
-                  $existingAssignments[$key] = $row;
-                }
-              }
-            } catch (Throwable $ex) {
-              // Fallback to empty array
-              $availableSections = [];
-              $existingAssignments = [];
-            }
-            ?>
-            <div class="info-card mt-3">
-              <div class="card-header-modern">
-                <i class="bi bi-list-check"></i>
-                <h3>Assign Building & Room to Available Sections</h3>
-              </div>
-              <div class="admin-hint mb-3">
-                <i class="bi bi-info-circle"></i>
-                <span><strong>Quick Assign:</strong> Select from available sections and assign them to buildings and rooms.</span>
-              </div>
-              
-              <?php if (empty($availableSections)): ?>
-                <div class="alert alert-info">
-                  <i class="bi bi-info-circle me-2"></i>No sections found. Please assign users to sections in User Management first.
-                </div>
-              <?php else: ?>
-                <div class="table-responsive">
-                  <table class="table table-hover">
-                    <thead>
-                      <tr>
-                        <th>Year</th>
-                        <th>Section</th>
-                        <th>Current Assignment</th>
-                        <th>Building</th>
-                        <th>Floor</th>
-                        <th>Room</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <?php foreach ($availableSections as $sec): 
-                        $key = $sec['year'] . '|' . $sec['section'];
-                        $existing = $existingAssignments[$key] ?? null;
-                        $hasAssignment = $existing !== null;
-                      ?>
-                        <tr>
-                          <td><strong><?php echo htmlspecialchars($sec['year']); ?></strong></td>
-                          <td><?php echo htmlspecialchars($sec['section']); ?></td>
-                          <td>
-                            <?php if ($hasAssignment): ?>
-                              <span class="badge bg-success">
-                                <i class="bi bi-check-circle"></i> Building <?php echo htmlspecialchars($existing['building']); ?>, 
-                                Floor <?php echo (int)$existing['floor']; ?>, 
-                                Room <?php echo htmlspecialchars($existing['room']); ?>
-                              </span>
-                            <?php else: ?>
-                              <span class="badge bg-warning">
-                                <i class="bi bi-exclamation-triangle"></i> Not Assigned
-                              </span>
-                            <?php endif; ?>
-                          </td>
-                          <td>
-                            <select name="building_<?php echo htmlspecialchars($key); ?>" class="form-select form-select-sm" form="assignForm_<?php echo htmlspecialchars($key); ?>">
-                              <option value="">Select...</option>
-                              <?php foreach (array_keys($buildings) as $bn): ?>
-                                <option value="<?php echo htmlspecialchars($bn); ?>" <?php echo ($hasAssignment && $existing['building']===$bn)?'selected':'';?>>
-                                  <?php echo htmlspecialchars($bn); ?>
-                                </option>
-                              <?php endforeach; ?>
-                            </select>
-                          </td>
-                          <td>
-                            <input type="number" name="floor_<?php echo htmlspecialchars($key); ?>" class="form-control form-control-sm" 
-                                   value="<?php echo $hasAssignment ? (int)$existing['floor'] : '1'; ?>" 
-                                   min="1" form="assignForm_<?php echo htmlspecialchars($key); ?>" />
-                          </td>
-                          <td>
-                            <input type="text" name="room_<?php echo htmlspecialchars($key); ?>" class="form-control form-control-sm" 
-                                   value="<?php echo $hasAssignment ? htmlspecialchars($existing['room']) : ''; ?>" 
-                                   placeholder="301" form="assignForm_<?php echo htmlspecialchars($key); ?>" />
-                          </td>
-                          <td>
-                            <form id="assignForm_<?php echo htmlspecialchars($key); ?>" action="/TCC/BackEnd/admin/manage_section_assignments.php" method="post" style="display:inline;" onsubmit="return updateSectionForm(this, '<?php echo htmlspecialchars($key); ?>')">
-                              <input type="hidden" name="action" value="<?php echo $hasAssignment ? 'update' : 'create'; ?>" />
-                              <?php if ($hasAssignment): ?>
-                                <input type="hidden" name="id" value="<?php echo (int)$existing['id']; ?>" />
-                              <?php endif; ?>
-                              <input type="hidden" name="year" value="<?php echo htmlspecialchars($sec['year']); ?>" />
-                              <input type="hidden" name="section" value="<?php echo htmlspecialchars($sec['section']); ?>" />
-                              <input type="hidden" name="building" value="" id="building_hidden_<?php echo htmlspecialchars($key); ?>" />
-                              <input type="hidden" name="floor" value="" id="floor_hidden_<?php echo htmlspecialchars($key); ?>" />
-                              <input type="hidden" name="room" value="" id="room_hidden_<?php echo htmlspecialchars($key); ?>" />
-                              <button type="submit" class="btn btn-sm btn-primary">
-                                <i class="bi bi-<?php echo $hasAssignment ? 'pencil' : 'plus-circle'; ?>"></i> 
-                                <?php echo $hasAssignment ? 'Update' : 'Assign'; ?>
-                              </button>
-                            </form>
-                          </td>
-                        </tr>
-                      <?php endforeach; ?>
-                    </tbody>
-                  </table>
-                </div>
-              <?php endif; ?>
-            </div>
-            
-            <!-- section -> room assignments -->
-            <?php if (!$editSectionRow): ?>
-            <div class="info-card mt-3">
-              <div class="card-header-modern">
-                <i class="bi bi-door-open"></i>
-                <h3>Setup Section Building & Room Assignment</h3>
-              </div>
-              <div class="admin-hint mb-3">
-                <i class="bi bi-info-circle"></i>
-                <span><strong>Note:</strong> When you assign a user to a year and section in User Management, their building and room will automatically display based on the section assignment below.</span>
-              </div>
-                <form class="admin-user-assign-form" action="/TCC/BackEnd/admin/manage_section_assignments.php" method="post">
-                  <input type="hidden" name="action" value="create" />
-                  <div class="row g-3">
-                    <div class="col-md-3">
-                      <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
-                        <select name="year" class="form-select form-select-lg">
-                          <option value="1">1st Year</option>
-                          <option value="2">2nd Year</option>
-                          <option value="3" selected>3rd Year</option>
-                          <option value="4">4th Year</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="col-md-3">
-                      <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-people"></i> Section Name</label>
-                        <input name="section" class="form-control form-control-lg" placeholder="Benevolence" required/>
-                      </div>
-                    </div>
-                    <div class="col-md-2">
-                      <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-building"></i> Building</label>
-                        <select name="building" class="form-select form-select-lg">
-                          <?php foreach (array_keys($buildings) as $bn): ?>
-                            <option><?php echo htmlspecialchars($bn); ?></option>
-                          <?php endforeach; ?>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="col-md-2">
-                      <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-layers"></i> Floor</label>
-                        <input name="floor" type="number" class="form-control form-control-lg" value="1" min="1" required/>
-                      </div>
-                    </div>
-                    <div class="col-md-2">
-                      <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-door-closed"></i> Room</label>
-                        <input name="room" class="form-control form-control-lg" placeholder="301" required/>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="row g-3 mt-2">
-                    <div class="col-md-12">
-                      <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="bi bi-check-circle me-2"></i>Assign Section
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </div>
-            <?php endif; ?>
             <?php
             // Load section assignments from database
             $sa = [];
@@ -642,7 +410,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             </div>
             <?php endif; ?>
             
-            <div class="info-card mt-3">
+            <div class="info-card buildings-card">
               <div class="card-header-modern">
                 <i class="bi bi-list-check"></i>
                 <h3>Section Building & Room Assignments</h3>
@@ -677,6 +445,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                   <?php endforeach; ?>
                 </ul>
               </div>
+            </div>
             </div>
 
           <?php elseif ($section === 'projects'): ?>
