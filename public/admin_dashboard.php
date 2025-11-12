@@ -98,22 +98,54 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
       </aside>
 
       <main class="home-main">
-        <div class="records-container">
-          <div class="records-header">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <h2 class="records-title">
-                  <i class="bi bi-speedometer2"></i> Admin Dashboard
-                </h2>
-                <p class="records-subtitle">
-                  Signed in as <strong><?php echo htmlspecialchars($adminName); ?></strong>
-                </p>
+          <div class="records-container">
+            <div class="records-header">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h2 class="records-title">
+                    <i class="bi bi-speedometer2"></i> Admin Dashboard
+                  </h2>
+                  <p class="records-subtitle">
+                    Signed in as <strong><?php echo htmlspecialchars($adminName); ?></strong>
+                  </p>
+                </div>
+                <a href="/TCC/public/home.php" class="btn btn-outline-secondary">
+                  <i class="bi bi-arrow-left-circle me-1"></i>Switch to User View
+                </a>
               </div>
-              <a href="/TCC/public/home.php" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left-circle me-1"></i>Switch to User View
-              </a>
             </div>
-          </div>
+            
+            <?php if (isset($_GET['success'])): ?>
+              <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>
+                <?php 
+                if ($_GET['success'] === '1'): 
+                  echo 'Section assignment created successfully!';
+                elseif ($_GET['success'] === 'updated'):
+                  echo 'Section assignment updated successfully!';
+                elseif ($_GET['success'] === 'deleted'):
+                  echo 'Section assignment deleted successfully!';
+                else:
+                  echo 'Operation completed successfully!';
+                endif;
+                ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            <?php endif; ?>
+            
+            <?php if (isset($_GET['error'])): ?>
+              <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <?php 
+                if ($_GET['error'] === 'missing'): 
+                  echo 'Please fill in all required fields.';
+                else:
+                  echo 'An error occurred. Please try again.';
+                endif;
+                ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            <?php endif; ?>
 
           <?php if ($section === 'announcements'): ?>
             <?php
@@ -293,16 +325,18 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
               <?php endif; ?>
             </div>
             <!-- section -> room assignments -->
+            <?php if (!$editSectionRow): ?>
             <div class="info-card mt-3">
               <div class="card-header-modern">
                 <i class="bi bi-door-open"></i>
-                <h3>Assign Section to Building / Room</h3>
+                <h3>Setup Section Building & Room Assignment</h3>
               </div>
               <div class="admin-hint mb-3">
                 <i class="bi bi-info-circle"></i>
                 <span><strong>Note:</strong> When you assign a user to a year and section in User Management, their building and room will automatically display based on the section assignment below.</span>
               </div>
                 <form class="admin-user-assign-form" action="/TCC/BackEnd/admin/manage_section_assignments.php" method="post">
+                  <input type="hidden" name="action" value="create" />
                   <div class="row g-3">
                     <div class="col-md-3">
                       <div class="admin-form-group">
@@ -354,13 +388,27 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                 </form>
               </div>
             </div>
+            <?php endif; ?>
             <?php
             // Load section assignments from database
             $sa = [];
+            $editSectionId = isset($_GET['edit_section_id']) ? intval($_GET['edit_section_id']) : 0;
+            $editSectionRow = null;
             try {
               require_once __DIR__ . '/../BackEnd/database/db.php';
               $connSa = Database::getInstance()->getConnection();
-              $saQuery = $connSa->query("SELECT year, section, building, floor, room FROM section_assignments ORDER BY year, section");
+              
+              // Load edit row if editing
+              if ($editSectionId > 0) {
+                $editStmt = $connSa->prepare("SELECT id, year, section, building, floor, room FROM section_assignments WHERE id = ? LIMIT 1");
+                $editStmt->bind_param('i', $editSectionId);
+                $editStmt->execute();
+                $editRes = $editStmt->get_result();
+                $editSectionRow = $editRes->fetch_assoc();
+                $editStmt->close();
+              }
+              
+              $saQuery = $connSa->query("SELECT id, year, section, building, floor, room FROM section_assignments ORDER BY year, section");
               if ($saQuery) {
                 while ($row = $saQuery->fetch_assoc()) {
                   $sa[] = $row;
@@ -372,24 +420,111 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
               if (file_exists($saPath)) { 
                 $saJson = json_decode(file_get_contents($saPath), true) ?: [];
                 foreach ($saJson as $key => $info) {
+                  if (!isset($info['id'])) {
+                    $info['id'] = 0; // Assign temporary ID for JSON entries
+                  }
                   $sa[] = $info;
                 }
               }
             }
             ?>
+            
+            <!-- Edit Section Assignment Form (shown when editing) -->
+            <?php if ($editSectionRow): ?>
+            <div class="info-card mt-3">
+              <div class="card-header-modern">
+                <i class="bi bi-pencil-square"></i>
+                <h3>Edit Section Building & Room Assignment</h3>
+              </div>
+              <form class="admin-user-assign-form" action="/TCC/BackEnd/admin/manage_section_assignments.php" method="post">
+                <input type="hidden" name="action" value="update" />
+                <input type="hidden" name="id" value="<?php echo (int)$editSectionRow['id']; ?>" />
+                <div class="row g-3">
+                  <div class="col-md-3">
+                    <div class="admin-form-group">
+                      <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
+                      <select name="year" class="form-select form-select-lg">
+                        <option value="1" <?php echo ($editSectionRow['year']=='1')?'selected':'';?>>1st Year</option>
+                        <option value="2" <?php echo ($editSectionRow['year']=='2')?'selected':'';?>>2nd Year</option>
+                        <option value="3" <?php echo ($editSectionRow['year']=='3')?'selected':'';?>>3rd Year</option>
+                        <option value="4" <?php echo ($editSectionRow['year']=='4')?'selected':'';?>>4th Year</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="admin-form-group">
+                      <label class="admin-form-label"><i class="bi bi-people"></i> Section Name</label>
+                      <input name="section" class="form-control form-control-lg" value="<?php echo htmlspecialchars($editSectionRow['section']); ?>" required/>
+                    </div>
+                  </div>
+                  <div class="col-md-2">
+                    <div class="admin-form-group">
+                      <label class="admin-form-label"><i class="bi bi-building"></i> Building</label>
+                      <select name="building" class="form-select form-select-lg">
+                        <?php foreach (array_keys($buildings) as $bn): ?>
+                          <option <?php echo ($editSectionRow['building']===$bn)?'selected':'';?>><?php echo htmlspecialchars($bn); ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-2">
+                    <div class="admin-form-group">
+                      <label class="admin-form-label"><i class="bi bi-layers"></i> Floor</label>
+                      <input name="floor" type="number" class="form-control form-control-lg" value="<?php echo (int)$editSectionRow['floor']; ?>" min="1" required/>
+                    </div>
+                  </div>
+                  <div class="col-md-2">
+                    <div class="admin-form-group">
+                      <label class="admin-form-label"><i class="bi bi-door-closed"></i> Room</label>
+                      <input name="room" class="form-control form-control-lg" value="<?php echo htmlspecialchars($editSectionRow['room']); ?>" required/>
+                    </div>
+                  </div>
+                </div>
+                <div class="row g-3 mt-2">
+                  <div class="col-md-12">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                      <i class="bi bi-check-circle me-2"></i>Update Section Assignment
+                    </button>
+                    <a href="/TCC/public/admin_dashboard.php?section=buildings" class="btn btn-secondary btn-lg ms-2">
+                      <i class="bi bi-x-circle me-2"></i>Cancel
+                    </a>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <?php endif; ?>
+            
             <div class="info-card mt-3">
               <div class="card-header-modern">
                 <i class="bi bi-list-check"></i>
-                <h3>Section Assignments</h3>
+                <h3>Section Building & Room Assignments</h3>
               </div>
                 <ul class="list-group">
                   <?php if (empty($sa)): ?><li class="list-group-item text-muted">No section assignments yet.</li><?php endif; ?>
                   <?php foreach ($sa as $info): ?>
-                    <li class="list-group-item">
-                      <strong><?php echo htmlspecialchars($info['year'] . ' - ' . $info['section']); ?></strong> 
-                      &mdash; Building <?php echo htmlspecialchars($info['building']); ?>, 
-                      Floor <?php echo (int)$info['floor']; ?>, 
-                      Room <?php echo htmlspecialchars($info['room']); ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                      <div>
+                        <strong><?php echo htmlspecialchars($info['year'] . ' - ' . $info['section']); ?></strong> 
+                        &mdash; Building <?php echo htmlspecialchars($info['building']); ?>, 
+                        Floor <?php echo (int)$info['floor']; ?>, 
+                        Room <?php echo htmlspecialchars($info['room']); ?>
+                      </div>
+                      <div class="btn-group">
+                        <?php if (!empty($info['id']) && $info['id'] > 0): ?>
+                        <a href="/TCC/public/admin_dashboard.php?section=buildings&edit_section_id=<?php echo (int)$info['id']; ?>" class="btn btn-sm btn-outline-primary">
+                          <i class="bi bi-pencil"></i> Edit
+                        </a>
+                        <form method="post" action="/TCC/BackEnd/admin/manage_section_assignments.php" onsubmit="return confirm('Delete this section assignment? This will remove the building/room assignment for this section.');" style="display:inline;">
+                          <input type="hidden" name="action" value="delete" />
+                          <input type="hidden" name="id" value="<?php echo (int)$info['id']; ?>" />
+                          <input type="hidden" name="year" value="<?php echo htmlspecialchars($info['year']); ?>" />
+                          <input type="hidden" name="section" value="<?php echo htmlspecialchars($info['section']); ?>" />
+                          <button class="btn btn-sm btn-outline-danger" type="submit">
+                            <i class="bi bi-trash"></i> Delete
+                          </button>
+                        </form>
+                        <?php endif; ?>
+                      </div>
                     </li>
                   <?php endforeach; ?>
                 </ul>
