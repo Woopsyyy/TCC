@@ -22,7 +22,7 @@ body.admin-dashboard {
 /* Admin Dashboard Background - using color palette */
 body.admin-dashboard {
   background-color: var(--color-ethereal);
-  /* Removed background image - using solid color for clarity */
+  /* Removed background image - using solid color for better contrast */
 }
 
 /* Admin specific card styling - matching color palette */
@@ -84,23 +84,7 @@ body.admin-dashboard {
   border: 1px solid var(--color-ethereal);
 }
 
-/* Fallback for browsers that don't support backdrop-filter: draw a blurred background image behind the card */
-@supports not (backdrop-filter: blur(1px)) {
-  .admin-dashboard .info-card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image: var(--admin-bg-image);
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    filter: blur(10px);
-    transform: scale(1.05);
-    z-index: 0;
-    pointer-events: none;
-  }
-  .admin-dashboard .info-card > * { position: relative; z-index: 1; }
-}
+/* Removed background image fallback - using solid colors for better contrast */
 
 .admin-dashboard .list-group-item {
   border-color: var(--color-ethereal);
@@ -208,57 +192,166 @@ body.admin-dashboard {
 .modal-footer { border-top: 2px solid var(--color-ethereal); padding: 16px 24px; }
 
 /* Grade System Styles */
-.grades-scroll-container {
+.grade-semester-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-bark);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--color-flora);
+}
+
+.grade-cards-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
   overflow-x: auto;
   padding-bottom: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-sage) var(--color-ethereal);
-}
-
-.grades-scroll-container::-webkit-scrollbar {
-  height: 8px;
-}
-
-.grades-scroll-container::-webkit-scrollbar-track {
-  background: var(--color-ethereal);
-  border-radius: 4px;
-}
-
-.grades-scroll-container::-webkit-scrollbar-thumb {
-  background: var(--color-sage);
-  border-radius: 4px;
-}
-
-.grades-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: var(--color-flora);
+  margin-bottom: 24px;
 }
 
 .grade-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 280px;
+  max-width: 320px;
+  box-shadow: 0 2px 12px rgba(47, 41, 38, 0.1);
+  border: 1px solid var(--color-ethereal);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .grade-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  box-shadow: 0 4px 20px rgba(47, 41, 38, 0.15);
 }
 
-/* Ensure proper text contrast for all form elements */
+.grade-card-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-ethereal);
+}
+
+.grade-subject-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-bark);
+  margin: 0 0 4px 0;
+}
+
+.grade-student {
+  font-size: 0.875rem;
+  color: var(--color-bark);
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.grade-student i {
+  color: var(--color-flora);
+  margin-right: 4px;
+}
+
+.grade-instructor {
+  font-size: 0.875rem;
+  color: var(--color-cliff);
+  margin: 0;
+}
+
+.grade-instructor i {
+  color: var(--color-flora);
+  margin-right: 4px;
+}
+
+.grade-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.grade-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.grade-label {
+  font-size: 0.875rem;
+  color: var(--color-cliff);
+  font-weight: 500;
+}
+
+.grade-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-flora);
+}
+
+.grade-card-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-ethereal);
+}
+
+.grade-card-actions .btn {
+  flex: 1;
+}
+
+/* Ensure proper text contrast */
+.admin-dashboard .text-muted {
+  color: var(--color-cliff) !important;
+}
+
 .admin-dashboard .form-control,
 .admin-dashboard .form-select {
-  background-color: var(--color-ethereal) !important;
-  color: var(--color-bark) !important;
-  border-color: var(--color-sage) !important;
-}
-
-.admin-dashboard .form-control::placeholder {
-  color: var(--color-cliff) !important;
-  opacity: 0.7;
+  background-color: #ffffff;
+  color: var(--color-bark);
+  border-color: var(--color-ethereal);
 }
 
 .admin-dashboard .form-control:focus,
 .admin-dashboard .form-select:focus {
-  background-color: var(--color-ethereal) !important;
-  color: var(--color-bark) !important;
-  border-color: var(--color-flora) !important;
-  box-shadow: 0 0 0 3px rgba(107, 95, 79, 0.1) !important;
+  background-color: #ffffff;
+  color: var(--color-bark);
+  border-color: var(--color-flora);
+}
+
+.admin-dashboard .list-group-item {
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--color-bark);
+}
+
+.admin-dashboard .table {
+  background-color: rgba(255, 255, 255, 0.95);
+  color: var(--color-bark);
+}
+
+.admin-dashboard .table thead th {
+  background-color: var(--color-ethereal);
+  color: var(--color-bark);
+  font-weight: 600;
+}
+
+.admin-dashboard .table tbody td {
+  color: var(--color-bark);
+}
+
+.admin-dashboard .alert {
+  background-color: rgba(255, 255, 255, 0.95);
+  color: var(--color-bark);
+  border-color: var(--color-ethereal);
+}
+
+.admin-dashboard .alert-success {
+  background-color: rgba(216, 218, 202, 0.3);
+  border-color: var(--color-flora);
+  color: var(--color-bark);
+}
+
+.admin-dashboard .alert-danger {
+  background-color: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.3);
+  color: var(--color-bark);
 }

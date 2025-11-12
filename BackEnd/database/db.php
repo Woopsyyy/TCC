@@ -171,22 +171,24 @@ class Database {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             
-            // Grades table
-            "CREATE TABLE IF NOT EXISTS grades (
+            // Student grades table
+            "CREATE TABLE IF NOT EXISTS student_grades (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT DEFAULT NULL,
                 username VARCHAR(200) NOT NULL,
-                semester VARCHAR(50) NOT NULL,
-                subject VARCHAR(200) NOT NULL,
-                teacher VARCHAR(200) NOT NULL,
-                prelim DECIMAL(5,2) DEFAULT NULL,
-                midterm DECIMAL(5,2) DEFAULT NULL,
-                finals DECIMAL(5,2) DEFAULT NULL,
+                year VARCHAR(10) NOT NULL,
+                semester VARCHAR(20) NOT NULL,
+                subject VARCHAR(255) NOT NULL,
+                instructor VARCHAR(255) DEFAULT NULL,
+                prelim_grade DECIMAL(5,2) DEFAULT NULL,
+                midterm_grade DECIMAL(5,2) DEFAULT NULL,
+                finals_grade DECIMAL(5,2) DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_user_id (user_id),
                 INDEX idx_username (username),
-                INDEX idx_semester (semester)
+                INDEX idx_year_semester (year, semester),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         ];
         

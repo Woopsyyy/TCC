@@ -92,7 +92,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             <li><a href="/TCC/public/admin_dashboard.php?section=buildings" class="nav-link <?php echo ($section==='buildings')?'active':''?>" data-bs-toggle="tooltip" title="Buildings"><i class="bi bi-building"></i><span class="nav-label">Buildings</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=projects" class="nav-link <?php echo ($section==='projects')?'active':''?>" data-bs-toggle="tooltip" title="Projects"><i class="bi bi-folder-fill"></i><span class="nav-label">Projects</span></a></li>
             <li><a href="/TCC/public/user_management.php" class="nav-link" data-bs-toggle="tooltip" title="User Management"><i class="bi bi-people-fill"></i><span class="nav-label">User Management</span></a></li>
-            <li><a href="/TCC/public/admin_dashboard.php?section=grades" class="nav-link <?php echo ($section==='grades')?'active':''?>" data-bs-toggle="tooltip" title="Grade System"><i class="bi bi-journal-text"></i><span class="nav-label">Grade System</span></a></li>
+            <li><a href="/TCC/public/admin_dashboard.php?section=grade_system" class="nav-link <?php echo ($section==='grade_system')?'active':''?>" data-bs-toggle="tooltip" title="Grade System"><i class="bi bi-journal-bookmark-fill"></i><span class="nav-label">Grade System</span></a></li>
           </ul>
         </nav>
         <div class="sidebar-bottom"><a href="/TCC/BackEnd/auth/logout.php" class="btn logout-icon" title="Logout"><i class="bi bi-box-arrow-right"></i></a></div>
@@ -123,15 +123,11 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                 if ($_GET['success'] === '1'): 
                   echo 'Section assignment created successfully!';
                 elseif ($_GET['success'] === 'updated'):
-                  echo 'Section assignment updated successfully!';
+                  echo ($section === 'grade_system') ? 'Grade updated successfully!' : 'Section assignment updated successfully!';
                 elseif ($_GET['success'] === 'deleted'):
-                  echo 'Section assignment deleted successfully!';
+                  echo ($section === 'grade_system') ? 'Grade deleted successfully!' : 'Section assignment deleted successfully!';
                 elseif ($_GET['success'] === 'created'):
-                  echo ($section === 'grades') ? 'Grade created successfully!' : 'Operation completed successfully!';
-                elseif ($_GET['success'] === 'updated' && $section === 'grades'):
-                  echo 'Grade updated successfully!';
-                elseif ($_GET['success'] === 'deleted' && $section === 'grades'):
-                  echo 'Grade deleted successfully!';
+                  echo ($section === 'grade_system') ? 'Grade created successfully!' : 'Operation completed successfully!';
                 else:
                   echo 'Operation completed successfully!';
                 endif;
@@ -744,218 +740,255 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
               <?php endif; ?>
             </div>
 
-            <?php // close section switch: if ($section === 'announcements') / elseif / elseif ... ?>
-            <?php endif; ?>
-
-          <?php elseif ($section === 'grades'): ?>
+          <?php elseif ($section === 'grade_system'): ?>
             <?php
             require_once __DIR__ . '/../BackEnd/database/db.php';
-            $connGrades = Database::getInstance()->getConnection();
+            $conn = Database::getInstance()->getConnection();
             
-            // Ensure grades table exists
-            $connGrades->query("CREATE TABLE IF NOT EXISTS grades (
-              id INT AUTO_INCREMENT PRIMARY KEY,
-              user_id INT DEFAULT NULL,
-              username VARCHAR(200) NOT NULL,
-              semester VARCHAR(50) NOT NULL,
-              subject VARCHAR(200) NOT NULL,
-              teacher VARCHAR(200) NOT NULL,
-              prelim DECIMAL(5,2) DEFAULT NULL,
-              midterm DECIMAL(5,2) DEFAULT NULL,
-              finals DECIMAL(5,2) DEFAULT NULL,
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-              INDEX idx_user_id (user_id),
-              INDEX idx_username (username),
-              INDEX idx_semester (semester)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            // Handle form submissions
+            $editGradeId = isset($_GET['edit_grade_id']) ? intval($_GET['edit_grade_id']) : 0;
+            $editGradeRow = null;
+            if ($editGradeId > 0) {
+              $s = $conn->prepare("SELECT id, user_id, username, year, semester, subject, instructor, prelim_grade, midterm_grade, finals_grade FROM student_grades WHERE id = ? LIMIT 1");
+              $s->bind_param('i', $editGradeId);
+              $s->execute();
+              $r = $s->get_result();
+              $editGradeRow = $r->fetch_assoc();
+            }
             
-            // Get all grades grouped by semester
-            $gradesBySemester = [];
-            $gradesQuery = $connGrades->query("SELECT id, username, semester, subject, teacher, prelim, midterm, finals FROM grades ORDER BY semester, subject");
-            if ($gradesQuery) {
-              while ($row = $gradesQuery->fetch_assoc()) {
-                $sem = $row['semester'];
-                if (!isset($gradesBySemester[$sem])) {
-                  $gradesBySemester[$sem] = [];
-                }
-                $gradesBySemester[$sem][] = $row;
+            // Get all students for dropdown
+            $students = [];
+            $studentsQuery = $conn->query("SELECT id, username, full_name FROM users WHERE role = 'student' ORDER BY full_name, username");
+            if ($studentsQuery) {
+              while ($row = $studentsQuery->fetch_assoc()) {
+                $students[] = $row;
               }
             }
             ?>
             
-            <!-- Add Grade Form -->
             <div class="info-card">
               <div class="card-header-modern">
-                <i class="bi bi-plus-circle"></i>
-                <h3>Add Grade</h3>
+                <i class="bi bi-journal-bookmark-fill"></i>
+                <h3><?php echo $editGradeRow ? 'Edit Student Grade' : 'Add Student Grade'; ?></h3>
               </div>
-              <div class="card-body p-3">
-                <form class="row g-3" action="/TCC/BackEnd/admin/manage_grades.php" method="post">
-                  <input type="hidden" name="action" value="create" />
-                  <div class="col-md-3">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Student Name</label>
-                    <input type="text" name="username" class="form-control" placeholder="Enter student name" required style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Semester</label>
-                    <select name="semester" class="form-select" required style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);">
-                      <option value="First Semester">First Semester</option>
-                      <option value="Second Semester">Second Semester</option>
-                    </select>
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Subject</label>
-                    <input type="text" name="subject" class="form-control" placeholder="Mathematics" required style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Teacher</label>
-                    <input type="text" name="teacher" class="form-control" placeholder="Ms. Johnson" required style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
-                  </div>
-                  <div class="col-md-1">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Prelim</label>
-                    <input type="number" name="prelim" class="form-control" min="0" max="100" step="0.01" style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
-                  </div>
-                  <div class="col-md-1">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Midterm</label>
-                    <input type="number" name="midterm" class="form-control" min="0" max="100" step="0.01" style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
-                  </div>
-                  <div class="col-md-1">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Finals</label>
-                    <input type="number" name="finals" class="form-control" min="0" max="100" step="0.01" style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
-                  </div>
-                  <div class="col-md-12">
-                    <button type="submit" class="btn btn-primary">
-                      <i class="bi bi-check-circle me-2"></i>Add Grade
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-            
-            <!-- Display Grades by Semester -->
-            <?php if (empty($gradesBySemester)): ?>
-              <div class="info-card mt-3">
-                <div class="alert alert-info">
-                  <i class="bi bi-info-circle me-2"></i>No grades recorded yet. Add grades using the form above.
-                </div>
-              </div>
-            <?php else: ?>
-              <?php foreach ($gradesBySemester as $semester => $grades): ?>
-                <div class="info-card mt-3">
-                  <div class="card-header-modern" style="background: var(--color-ethereal); border-bottom: 3px solid var(--color-flora);">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                      <div style="width: 6px; height: 40px; background-color: var(--color-flora); border-radius: 3px;"></div>
-                      <h3 style="color: var(--color-bark); margin: 0; font-size: 1.75rem; font-weight: 700;"><?php echo htmlspecialchars($semester); ?></h3>
-                    </div>
-                  </div>
-                  <div class="card-body p-4" style="background: var(--color-ethereal);">
-                    <div class="grades-scroll-container" style="overflow-x: auto; padding-bottom: 10px;">
-                      <div class="grades-cards-wrapper" style="display: flex; gap: 20px; min-width: max-content;">
-                        <?php foreach ($grades as $grade): ?>
-                          <div class="grade-card" style="min-width: 280px; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid var(--color-sage);">
-                            <h4 style="color: var(--color-bark); font-size: 1.25rem; font-weight: 700; margin-bottom: 8px;"><?php echo htmlspecialchars($grade['subject']); ?></h4>
-                            <p style="color: var(--color-cliff); font-size: 0.9rem; margin-bottom: 16px;"><?php echo htmlspecialchars($grade['teacher']); ?></p>
-                            <div class="grade-scores" style="display: flex; flex-direction: column; gap: 10px;">
-                              <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="color: var(--color-cliff); font-size: 0.9rem;">Prelim</span>
-                                <strong style="color: var(--color-flora); font-size: 1.1rem; font-weight: 700;"><?php echo $grade['prelim'] !== null ? number_format($grade['prelim'], 0) : '-'; ?></strong>
-                              </div>
-                              <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="color: var(--color-cliff); font-size: 0.9rem;">Midterm</span>
-                                <strong style="color: var(--color-flora); font-size: 1.1rem; font-weight: 700;"><?php echo $grade['midterm'] !== null ? number_format($grade['midterm'], 0) : '-'; ?></strong>
-                              </div>
-                              <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="color: var(--color-cliff); font-size: 0.9rem;">Finals</span>
-                                <strong style="color: var(--color-flora); font-size: 1.1rem; font-weight: 700;"><?php echo $grade['finals'] !== null ? number_format($grade['finals'], 0) : '-'; ?></strong>
-                              </div>
-                            </div>
-                            <div class="grade-actions mt-3" style="display: flex; gap: 8px;">
-                              <a href="/TCC/public/admin_dashboard.php?section=grades&edit_grade_id=<?php echo (int)$grade['id']; ?>" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-pencil"></i> Edit
-                              </a>
-                              <form method="post" action="/TCC/BackEnd/admin/manage_grades.php" onsubmit="return confirm('Delete this grade record?');" style="display:inline;">
-                                <input type="hidden" name="action" value="delete" />
-                                <input type="hidden" name="id" value="<?php echo (int)$grade['id']; ?>" />
-                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                  <i class="bi bi-trash"></i> Delete
-                                </button>
-                              </form>
-                            </div>
-                          </div>
-                        <?php endforeach; ?>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              <?php endforeach; ?>
-            <?php endif; ?>
-            
-            <!-- Edit Grade Form (shown when editing) -->
-            <?php
-            $editGradeId = isset($_GET['edit_grade_id']) ? intval($_GET['edit_grade_id']) : 0;
-            $editGradeRow = null;
-            if ($editGradeId > 0) {
-              $editGradeStmt = $connGrades->prepare("SELECT id, username, semester, subject, teacher, prelim, midterm, finals FROM grades WHERE id = ? LIMIT 1");
-              $editGradeStmt->bind_param('i', $editGradeId);
-              $editGradeStmt->execute();
-              $editGradeRes = $editGradeStmt->get_result();
-              $editGradeRow = $editGradeRes->fetch_assoc();
-              $editGradeStmt->close();
-            }
-            ?>
-            <?php if ($editGradeRow): ?>
-            <div class="info-card mt-3">
-              <div class="card-header-modern">
-                <i class="bi bi-pencil-square"></i>
-                <h3>Edit Grade</h3>
-              </div>
-              <div class="card-body p-3">
-                <form class="row g-3" action="/TCC/BackEnd/admin/manage_grades.php" method="post">
+              <form class="form-small" action="/TCC/BackEnd/admin/manage_grades.php" method="post">
+                <?php if ($editGradeRow): ?>
                   <input type="hidden" name="action" value="update" />
                   <input type="hidden" name="id" value="<?php echo (int)$editGradeRow['id']; ?>" />
-                  <div class="col-md-3">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Student Name</label>
-                    <input type="text" name="username" class="form-control" value="<?php echo htmlspecialchars($editGradeRow['username']); ?>" required style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Semester</label>
-                    <select name="semester" class="form-select" required style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);">
-                      <option value="First Semester" <?php echo ($editGradeRow['semester']==='First Semester')?'selected':'';?>>First Semester</option>
-                      <option value="Second Semester" <?php echo ($editGradeRow['semester']==='Second Semester')?'selected':'';?>>Second Semester</option>
+                <?php else: ?>
+                  <input type="hidden" name="action" value="create" />
+                <?php endif; ?>
+                
+                <div class="mb-3">
+                  <label class="admin-form-label"><i class="bi bi-person"></i> Student</label>
+                  <select name="user_id" class="form-select form-select-lg" required>
+                    <option value="">Select Student...</option>
+                    <?php if (empty($students)): ?>
+                      <option value="" disabled>No students found. Please create student accounts first.</option>
+                    <?php else: ?>
+                      <?php foreach ($students as $student): ?>
+                        <option value="<?php echo (int)$student['id']; ?>" <?php echo ($editGradeRow && $editGradeRow['user_id'] == $student['id']) ? 'selected' : ''; ?>>
+                          <?php echo htmlspecialchars($student['full_name'] . ' (' . $student['username'] . ')'); ?>
+                        </option>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </select>
+                </div>
+                
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
+                    <select name="year" class="form-select form-select-lg" required>
+                      <option value="1" <?php echo ($editGradeRow && $editGradeRow['year']=='1')?'selected':'';?>>1st Year</option>
+                      <option value="2" <?php echo ($editGradeRow && $editGradeRow['year']=='2')?'selected':'';?>>2nd Year</option>
+                      <option value="3" <?php echo ($editGradeRow && $editGradeRow['year']=='3')?'selected':'';?>>3rd Year</option>
+                      <option value="4" <?php echo ($editGradeRow && $editGradeRow['year']=='4')?'selected':'';?>>4th Year</option>
                     </select>
                   </div>
-                  <div class="col-md-2">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Subject</label>
-                    <input type="text" name="subject" class="form-control" value="<?php echo htmlspecialchars($editGradeRow['subject']); ?>" required style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
+                  <div class="col-md-6">
+                    <label class="admin-form-label"><i class="bi bi-calendar3"></i> Semester</label>
+                    <select name="semester" class="form-select form-select-lg" required>
+                      <option value="First Semester" <?php echo ($editGradeRow && $editGradeRow['semester']=='First Semester')?'selected':'';?>>First Semester</option>
+                      <option value="Second Semester" <?php echo ($editGradeRow && $editGradeRow['semester']=='Second Semester')?'selected':'';?>>Second Semester</option>
+                    </select>
                   </div>
-                  <div class="col-md-2">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Teacher</label>
-                    <input type="text" name="teacher" class="form-control" value="<?php echo htmlspecialchars($editGradeRow['teacher']); ?>" required style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
+                </div>
+                
+                <div class="mb-3">
+                  <label class="admin-form-label"><i class="bi bi-book"></i> Subject</label>
+                  <input name="subject" class="form-control form-control-lg" placeholder="e.g. Mathematics" required value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['subject']) : ''; ?>"/>
+                </div>
+                
+                <div class="mb-3">
+                  <label class="admin-form-label"><i class="bi bi-person-badge"></i> Instructor</label>
+                  <input name="instructor" class="form-control form-control-lg" placeholder="e.g. Ms. Johnson" value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['instructor'] ?? '') : ''; ?>"/>
+                </div>
+                
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4">
+                    <label class="admin-form-label"><i class="bi bi-1-circle"></i> Prelim</label>
+                    <input name="prelim_grade" type="number" step="0.01" min="0" max="100" class="form-control form-control-lg" placeholder="88" value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['prelim_grade'] ?? '') : ''; ?>"/>
                   </div>
-                  <div class="col-md-1">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Prelim</label>
-                    <input type="number" name="prelim" class="form-control" value="<?php echo $editGradeRow['prelim'] !== null ? $editGradeRow['prelim'] : ''; ?>" min="0" max="100" step="0.01" style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
+                  <div class="col-md-4">
+                    <label class="admin-form-label"><i class="bi bi-2-circle"></i> Midterm</label>
+                    <input name="midterm_grade" type="number" step="0.01" min="0" max="100" class="form-control form-control-lg" placeholder="92" value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['midterm_grade'] ?? '') : ''; ?>"/>
                   </div>
-                  <div class="col-md-1">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Midterm</label>
-                    <input type="number" name="midterm" class="form-control" value="<?php echo $editGradeRow['midterm'] !== null ? $editGradeRow['midterm'] : ''; ?>" min="0" max="100" step="0.01" style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
+                  <div class="col-md-4">
+                    <label class="admin-form-label"><i class="bi bi-3-circle"></i> Finals</label>
+                    <input name="finals_grade" type="number" step="0.01" min="0" max="100" class="form-control form-control-lg" placeholder="90" value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['finals_grade'] ?? '') : ''; ?>"/>
                   </div>
-                  <div class="col-md-1">
-                    <label class="form-label fw-bold" style="color: var(--color-bark);">Finals</label>
-                    <input type="number" name="finals" class="form-control" value="<?php echo $editGradeRow['finals'] !== null ? $editGradeRow['finals'] : ''; ?>" min="0" max="100" step="0.01" style="background-color: var(--color-ethereal); color: var(--color-bark); border-color: var(--color-sage);"/>
-                  </div>
-                  <div class="col-md-12">
-                    <button type="submit" class="btn btn-primary">
-                      <i class="bi bi-check-circle me-2"></i>Update Grade
-                    </button>
-                    <a href="/TCC/public/admin_dashboard.php?section=grades" class="btn btn-secondary ms-2">
-                      <i class="bi bi-x-circle me-2"></i>Cancel
-                    </a>
-                  </div>
-                </form>
-              </div>
+                </div>
+                
+                <button class="btn btn-primary btn-lg">
+                  <i class="bi bi-check-circle me-2"></i><?php echo $editGradeRow ? 'Update Grade' : 'Save Grade'; ?>
+                </button>
+                <?php if ($editGradeRow): ?>
+                  <a href="/TCC/public/admin_dashboard.php?section=grade_system" class="btn btn-secondary btn-lg ms-2">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                  </a>
+                <?php endif; ?>
+              </form>
             </div>
+            
+            <!-- Display Grades by Year -->
+            <?php
+            $years = ['1', '2', '3', '4'];
+            foreach ($years as $yearNum):
+              // Get grades for this year
+              $gradesQuery = $conn->prepare("SELECT sg.*, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id WHERE sg.year = ? ORDER BY sg.semester, sg.subject");
+              $gradesQuery->bind_param('s', $yearNum);
+              $gradesQuery->execute();
+              $gradesResult = $gradesQuery->get_result();
+              $yearGrades = [];
+              while ($row = $gradesResult->fetch_assoc()) {
+                $yearGrades[] = $row;
+              }
+              $gradesQuery->close();
+              
+              // Group by semester
+              $firstSemester = [];
+              $secondSemester = [];
+              foreach ($yearGrades as $grade) {
+                if ($grade['semester'] === 'First Semester') {
+                  $firstSemester[] = $grade;
+                } else {
+                  $secondSemester[] = $grade;
+                }
+              }
+            ?>
+            <div class="info-card mt-3">
+              <div class="card-header-modern">
+                <i class="bi bi-calendar-year"></i>
+                <h3><?php echo $yearNum; ?><?php echo $yearNum == '1' ? 'st' : ($yearNum == '2' ? 'nd' : ($yearNum == '3' ? 'rd' : 'th')); ?> Year</h3>
+              </div>
+              
+              <!-- First Semester -->
+              <?php if (!empty($firstSemester)): ?>
+                <div class="mb-4">
+                  <h4 class="grade-semester-title">First Semester</h4>
+                  <div class="grade-cards-container">
+                    <?php foreach ($firstSemester as $grade): ?>
+                      <div class="grade-card">
+                        <div class="grade-card-header">
+                          <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
+                          <?php if (!empty($grade['full_name'])): ?>
+                            <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['full_name']); ?></p>
+                          <?php elseif (!empty($grade['username'])): ?>
+                            <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['username']); ?></p>
+                          <?php endif; ?>
+                          <?php if (!empty($grade['instructor'])): ?>
+                            <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
+                          <?php endif; ?>
+                        </div>
+                        <div class="grade-details">
+                          <div class="grade-item">
+                            <span class="grade-label">Prelim</span>
+                            <span class="grade-value"><?php echo $grade['prelim_grade'] !== null ? htmlspecialchars($grade['prelim_grade']) : '-'; ?></span>
+                          </div>
+                          <div class="grade-item">
+                            <span class="grade-label">Midterm</span>
+                            <span class="grade-value"><?php echo $grade['midterm_grade'] !== null ? htmlspecialchars($grade['midterm_grade']) : '-'; ?></span>
+                          </div>
+                          <div class="grade-item">
+                            <span class="grade-label">Finals</span>
+                            <span class="grade-value"><?php echo $grade['finals_grade'] !== null ? htmlspecialchars($grade['finals_grade']) : '-'; ?></span>
+                          </div>
+                        </div>
+                        <div class="grade-card-actions">
+                          <a href="/TCC/public/admin_dashboard.php?section=grade_system&edit_grade_id=<?php echo (int)$grade['id']; ?>" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Edit
+                          </a>
+                          <form method="post" action="/TCC/BackEnd/admin/manage_grades.php" onsubmit="return confirm('Delete this grade record?');" style="display:inline;">
+                            <input type="hidden" name="action" value="delete" />
+                            <input type="hidden" name="id" value="<?php echo (int)$grade['id']; ?>" />
+                            <button class="btn btn-sm btn-outline-danger" type="submit">
+                              <i class="bi bi-trash"></i> Delete
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              <?php endif; ?>
+              
+              <!-- Second Semester -->
+              <?php if (!empty($secondSemester)): ?>
+                <div class="mb-4">
+                  <h4 class="grade-semester-title">Second Semester</h4>
+                  <div class="grade-cards-container">
+                    <?php foreach ($secondSemester as $grade): ?>
+                      <div class="grade-card">
+                        <div class="grade-card-header">
+                          <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
+                          <?php if (!empty($grade['full_name'])): ?>
+                            <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['full_name']); ?></p>
+                          <?php elseif (!empty($grade['username'])): ?>
+                            <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['username']); ?></p>
+                          <?php endif; ?>
+                          <?php if (!empty($grade['instructor'])): ?>
+                            <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
+                          <?php endif; ?>
+                        </div>
+                        <div class="grade-details">
+                          <div class="grade-item">
+                            <span class="grade-label">Prelim</span>
+                            <span class="grade-value"><?php echo $grade['prelim_grade'] !== null ? htmlspecialchars($grade['prelim_grade']) : '-'; ?></span>
+                          </div>
+                          <div class="grade-item">
+                            <span class="grade-label">Midterm</span>
+                            <span class="grade-value"><?php echo $grade['midterm_grade'] !== null ? htmlspecialchars($grade['midterm_grade']) : '-'; ?></span>
+                          </div>
+                          <div class="grade-item">
+                            <span class="grade-label">Finals</span>
+                            <span class="grade-value"><?php echo $grade['finals_grade'] !== null ? htmlspecialchars($grade['finals_grade']) : '-'; ?></span>
+                          </div>
+                        </div>
+                        <div class="grade-card-actions">
+                          <a href="/TCC/public/admin_dashboard.php?section=grade_system&edit_grade_id=<?php echo (int)$grade['id']; ?>" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Edit
+                          </a>
+                          <form method="post" action="/TCC/BackEnd/admin/manage_grades.php" onsubmit="return confirm('Delete this grade record?');" style="display:inline;">
+                            <input type="hidden" name="action" value="delete" />
+                            <input type="hidden" name="id" value="<?php echo (int)$grade['id']; ?>" />
+                            <button class="btn btn-sm btn-outline-danger" type="submit">
+                              <i class="bi bi-trash"></i> Delete
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              <?php endif; ?>
+              
+              <?php if (empty($firstSemester) && empty($secondSemester)): ?>
+                <p class="text-muted">No grades recorded for <?php echo $yearNum; ?><?php echo $yearNum == '1' ? 'st' : ($yearNum == '2' ? 'nd' : ($yearNum == '3' ? 'rd' : 'th')); ?> Year yet.</p>
+              <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+
+            <?php // close section switch: if ($section === 'announcements') / elseif / elseif ... ?>
             <?php endif; ?>
 
           </div>
