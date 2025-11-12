@@ -467,7 +467,7 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                       </div>
                     </div>
                     
-                    <?php if (($sanctionDays !== null && $sanctionDays > 0) || strpos($sanctionText, 'days') !== false || $sanctionText === 'Yes' || $sanctionText === 'Expired'): ?>
+                    <?php if (!empty($sanctions) || ($sanctionDays !== null && $sanctionDays > 0) || strpos($sanctionText, 'days') !== false || $sanctionText === 'Yes' || $sanctionText === 'Expired'): ?>
                     <div class="financial-item status-warning">
                       <div class="financial-icon">
                         <i class="bi bi-exclamation-triangle"></i>
@@ -481,8 +481,10 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                             <span class="days-remaining"><?php echo htmlspecialchars($sanctionText); ?></span>
                           <?php elseif ($sanctionText === 'Expired'): ?>
                             <span class="text-muted">Sanction expired</span>
-                          <?php else: ?>
+                          <?php elseif ($sanctionText === 'Yes'): ?>
                             <span class="text-warning"><?php echo htmlspecialchars($sanctionText); ?></span>
+                          <?php else: ?>
+                            <span class="days-remaining"><?php echo htmlspecialchars($sanctionText); ?></span>
                           <?php endif; ?>
                         </span>
                       </div>
@@ -501,6 +503,103 @@ $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
                   </small>
                 </div>
               </div>
+              
+              <!-- Student Grades Display -->
+              <?php
+              try {
+                $currentUserId = $_SESSION['user_id'] ?? null;
+                $currentUsername = $_SESSION['username'] ?? '';
+                $currentFullName = $_SESSION['full_name'] ?? '';
+                
+                $studentGrades = [];
+                if ($currentUserId) {
+                  $gradesStmt = $conn->prepare("SELECT year, semester, subject, instructor, prelim_grade, midterm_grade, finals_grade FROM student_grades WHERE user_id = ? ORDER BY year, semester, subject");
+                  $gradesStmt->bind_param('i', $currentUserId);
+                  $gradesStmt->execute();
+                  $gradesResult = $gradesStmt->get_result();
+                  while ($gradeRow = $gradesResult->fetch_assoc()) {
+                    $studentGrades[] = $gradeRow;
+                  }
+                  $gradesStmt->close();
+                }
+                
+                // Also try by username if no grades found by user_id
+                if (empty($studentGrades) && !empty($currentFullName)) {
+                  $gradesStmt2 = $conn->prepare("SELECT year, semester, subject, instructor, prelim_grade, midterm_grade, finals_grade FROM student_grades WHERE username = ? OR username LIKE ? ORDER BY year, semester, subject");
+                  $likeName = '%' . $currentFullName . '%';
+                  $gradesStmt2->bind_param('ss', $currentFullName, $likeName);
+                  $gradesStmt2->execute();
+                  $gradesResult2 = $gradesStmt2->get_result();
+                  while ($gradeRow2 = $gradesResult2->fetch_assoc()) {
+                    $studentGrades[] = $gradeRow2;
+                  }
+                  $gradesStmt2->close();
+                }
+                
+                if (!empty($studentGrades)):
+                  // Group by year and semester
+                  $gradesByYear = [];
+                  foreach ($studentGrades as $grade) {
+                    $year = $grade['year'];
+                    $semester = $grade['semester'];
+                    if (!isset($gradesByYear[$year])) {
+                      $gradesByYear[$year] = ['First Semester' => [], 'Second Semester' => []];
+                    }
+                    $gradesByYear[$year][$semester][] = $grade;
+                  }
+              ?>
+              <div class="info-card mt-3">
+                <div class="card-header-modern">
+                  <i class="bi bi-journal-bookmark-fill"></i>
+                  <h3>My Grades</h3>
+                </div>
+                
+                <?php foreach ($gradesByYear as $yearNum => $semesters): ?>
+                  <div class="mb-4">
+                    <h4 class="grade-semester-title"><?php echo $yearNum; ?><?php echo $yearNum == '1' ? 'st' : ($yearNum == '2' ? 'nd' : ($yearNum == '3' ? 'rd' : 'th')); ?> Year</h4>
+                    
+                    <?php foreach (['First Semester', 'Second Semester'] as $semName): ?>
+                      <?php if (!empty($semesters[$semName])): ?>
+                        <div class="mb-3">
+                          <h5 style="font-size: 1rem; font-weight: 600; color: var(--color-bark); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--color-ethereal);"><?php echo $semName; ?></h5>
+                          <div class="grade-cards-container">
+                            <?php foreach ($semesters[$semName] as $grade): ?>
+                              <div class="grade-card">
+                                <div class="grade-card-header">
+                                  <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
+                                  <?php if (!empty($grade['instructor'])): ?>
+                                    <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
+                                  <?php endif; ?>
+                                </div>
+                                <div class="grade-details">
+                                  <div class="grade-item">
+                                    <span class="grade-label">Prelim</span>
+                                    <span class="grade-value"><?php echo $grade['prelim_grade'] !== null ? htmlspecialchars($grade['prelim_grade']) : '-'; ?></span>
+                                  </div>
+                                  <div class="grade-item">
+                                    <span class="grade-label">Midterm</span>
+                                    <span class="grade-value"><?php echo $grade['midterm_grade'] !== null ? htmlspecialchars($grade['midterm_grade']) : '-'; ?></span>
+                                  </div>
+                                  <div class="grade-item">
+                                    <span class="grade-label">Finals</span>
+                                    <span class="grade-value"><?php echo $grade['finals_grade'] !== null ? htmlspecialchars($grade['finals_grade']) : '-'; ?></span>
+                                  </div>
+                                </div>
+                              </div>
+                            <?php endforeach; ?>
+                          </div>
+                        </div>
+                      <?php endif; ?>
+                    <?php endforeach; ?>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <?php
+                endif;
+              } catch (Throwable $ex) {
+                // Silently fail if grades table doesn't exist or error occurs
+              }
+              ?>
             </div>
           </div>
           <?php

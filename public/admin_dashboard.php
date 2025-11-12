@@ -619,13 +619,77 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
               </form>
             </div>
             
+            <!-- Student Filter -->
+            <?php
+            // Get all unique students with grades
+            $allStudentsWithGrades = [];
+            $studentsQuery = $conn->query("SELECT DISTINCT sg.user_id, sg.username, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id ORDER BY u.full_name, sg.username");
+            if ($studentsQuery) {
+              while ($row = $studentsQuery->fetch_assoc()) {
+                if (!empty($row['user_id']) || !empty($row['username'])) {
+                  $allStudentsWithGrades[] = $row;
+                }
+              }
+            }
+            
+            $selectedStudentId = isset($_GET['student_id']) ? intval($_GET['student_id']) : null;
+            $selectedStudentName = '';
+            if ($selectedStudentId) {
+              $nameQuery = $conn->prepare("SELECT full_name, username FROM users WHERE id = ? LIMIT 1");
+              $nameQuery->bind_param('i', $selectedStudentId);
+              $nameQuery->execute();
+              $nameResult = $nameQuery->get_result();
+              if ($nameRow = $nameResult->fetch_assoc()) {
+                $selectedStudentName = $nameRow['full_name'] ?? $nameRow['username'] ?? '';
+              }
+              $nameQuery->close();
+            }
+            ?>
+            
+            <?php if (!empty($allStudentsWithGrades)): ?>
+            <div class="info-card mt-3">
+              <div class="card-header-modern">
+                <i class="bi bi-funnel"></i>
+                <h3>Filter by Student</h3>
+              </div>
+              <div class="p-3">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <a href="/TCC/public/admin_dashboard.php?section=grade_system" class="btn btn-sm <?php echo $selectedStudentId === null ? 'btn-primary' : 'btn-outline-secondary'; ?>">
+                    <i class="bi bi-x-circle"></i> All Students
+                  </a>
+                  <?php foreach ($allStudentsWithGrades as $student): ?>
+                    <?php 
+                    $studentId = !empty($student['user_id']) ? (int)$student['user_id'] : null;
+                    $studentDisplayName = !empty($student['full_name']) ? $student['full_name'] : $student['username'];
+                    $isSelected = $selectedStudentId === $studentId;
+                    ?>
+                    <a href="/TCC/public/admin_dashboard.php?section=grade_system&student_id=<?php echo $studentId; ?>" 
+                       class="btn btn-sm <?php echo $isSelected ? 'btn-primary' : 'btn-outline-primary'; ?>">
+                      <i class="bi bi-person"></i> <?php echo htmlspecialchars($studentDisplayName); ?>
+                    </a>
+                  <?php endforeach; ?>
+                </div>
+                <?php if ($selectedStudentId): ?>
+                  <div class="mt-3 alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>Showing grades for: <strong><?php echo htmlspecialchars($selectedStudentName); ?></strong>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+            <?php endif; ?>
+            
             <!-- Display Grades by Year -->
             <?php
             $years = ['1', '2', '3', '4'];
             foreach ($years as $yearNum):
-              // Get grades for this year
-              $gradesQuery = $conn->prepare("SELECT sg.*, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id WHERE sg.year = ? ORDER BY sg.semester, sg.subject");
-              $gradesQuery->bind_param('s', $yearNum);
+              // Get grades for this year, optionally filtered by student
+              if ($selectedStudentId) {
+                $gradesQuery = $conn->prepare("SELECT sg.*, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id WHERE sg.year = ? AND sg.user_id = ? ORDER BY sg.semester, sg.subject");
+                $gradesQuery->bind_param('si', $yearNum, $selectedStudentId);
+              } else {
+                $gradesQuery = $conn->prepare("SELECT sg.*, u.full_name FROM student_grades sg LEFT JOIN users u ON sg.user_id = u.id WHERE sg.year = ? ORDER BY sg.semester, sg.subject");
+                $gradesQuery->bind_param('s', $yearNum);
+              }
               $gradesQuery->execute();
               $gradesResult = $gradesQuery->get_result();
               $yearGrades = [];
@@ -633,6 +697,11 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                 $yearGrades[] = $row;
               }
               $gradesQuery->close();
+              
+              // Skip this year if no grades and student is filtered
+              if ($selectedStudentId && empty($yearGrades)) {
+                continue;
+              }
               
               // Group by semester
               $firstSemester = [];
@@ -660,10 +729,12 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                       <div class="grade-card">
                         <div class="grade-card-header">
                           <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
-                          <?php if (!empty($grade['full_name'])): ?>
-                            <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['full_name']); ?></p>
-                          <?php elseif (!empty($grade['username'])): ?>
-                            <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['username']); ?></p>
+                          <?php if (!$selectedStudentId): ?>
+                            <?php if (!empty($grade['full_name'])): ?>
+                              <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['full_name']); ?></p>
+                            <?php elseif (!empty($grade['username'])): ?>
+                              <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['username']); ?></p>
+                            <?php endif; ?>
                           <?php endif; ?>
                           <?php if (!empty($grade['instructor'])): ?>
                             <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
@@ -710,10 +781,12 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                       <div class="grade-card">
                         <div class="grade-card-header">
                           <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
-                          <?php if (!empty($grade['full_name'])): ?>
-                            <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['full_name']); ?></p>
-                          <?php elseif (!empty($grade['username'])): ?>
-                            <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['username']); ?></p>
+                          <?php if (!$selectedStudentId): ?>
+                            <?php if (!empty($grade['full_name'])): ?>
+                              <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['full_name']); ?></p>
+                            <?php elseif (!empty($grade['username'])): ?>
+                              <p class="grade-student"><i class="bi bi-person"></i> <?php echo htmlspecialchars($grade['username']); ?></p>
+                            <?php endif; ?>
                           <?php endif; ?>
                           <?php if (!empty($grade['instructor'])): ?>
                             <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
