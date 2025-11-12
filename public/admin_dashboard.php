@@ -861,7 +861,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             ?>
             
             <?php if (!empty($allStudentsWithGrades)): ?>
-            <div class="info-card mt-3">
+            <div class="info-card mt-3 grade-filter-card">
               <div class="card-header-modern">
                 <i class="bi bi-funnel"></i>
                 <h3>Filter by Student</h3>
@@ -940,14 +940,14 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             ?>
             <div class="grade-year-card">
               <?php $collapseId = 'gradeYearCollapse' . $yearNum; ?>
-              <button class="grade-year-header" type="button" data-bs-toggle="collapse" data-bs-target="#<?php echo $collapseId; ?>" aria-expanded="<?php echo ($selectedStudentId ? 'true' : ($yearNum === '1' ? 'true' : 'false')); ?>" aria-controls="<?php echo $collapseId; ?>">
+              <button class="grade-year-header" type="button" data-bs-toggle="collapse" data-bs-target="#<?php echo $collapseId; ?>" aria-expanded="<?php echo ($selectedStudentId ? 'true' : 'false'); ?>" aria-controls="<?php echo $collapseId; ?>">
                 <div class="d-flex align-items-center gap-2">
                   <i class="bi bi-calendar-year"></i>
                   <span><?php echo $yearNum; ?><?php echo $yearNum == '1' ? 'st' : ($yearNum == '2' ? 'nd' : ($yearNum == '3' ? 'rd' : 'th')); ?> Year</span>
                 </div>
                 <i class="bi bi-chevron-down"></i>
               </button>
-              <div id="<?php echo $collapseId; ?>" class="collapse <?php echo ($selectedStudentId || $yearNum === '1') ? 'show' : ''; ?> grade-year-body">
+              <div id="<?php echo $collapseId; ?>" class="collapse <?php echo ($selectedStudentId ? 'show' : ''); ?> grade-year-body">
                 <div class="grade-student-list">
                   <?php $studentIndex = 0; foreach ($studentGroups as $groupKey => $group): ?>
                     <?php

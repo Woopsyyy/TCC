@@ -376,7 +376,7 @@ body.admin-dashboard {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .grade-year-card {
@@ -422,6 +422,7 @@ body.admin-dashboard {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  margin-top: 12px;
 }
 
 .student-grade-card {
@@ -444,6 +445,10 @@ body.admin-dashboard {
   color: var(--color-bark);
   cursor: pointer;
   transition: background 0.2s ease;
+}
+
+.grade-filter-card {
+  margin-bottom: 12px;
 }
 
 .student-grade-header:hover {
