@@ -114,13 +114,21 @@ body::before {
   font-size: 0.95rem;
   transition: all 0.3s ease;
   background-color: var(--color-cliff);
-  color: var(--color-ethereal);
+  color: var(--color-ethereal) !important;
   margin-bottom: 1rem;
 }
 
 .form-control::placeholder {
-  color: var(--color-sage);
-  opacity: 0.7;
+  color: var(--color-sage) !important;
+  opacity: 0.8;
+}
+
+.form-control:-webkit-autofill,
+.form-control:-webkit-autofill:hover,
+.form-control:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-ethereal) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-cliff) inset !important;
+  box-shadow: 0 0 0px 1000px var(--color-cliff) inset !important;
 }
 
 .form-control:focus {

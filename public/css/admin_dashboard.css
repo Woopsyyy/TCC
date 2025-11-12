@@ -22,11 +22,7 @@ body.admin-dashboard {
 /* Admin Dashboard Background - using color palette */
 body.admin-dashboard {
   background-color: var(--color-ethereal);
-  background-image: var(--admin-bg-image);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  /* Removed background image - using solid color for clarity */
 }
 
 /* Admin specific card styling - matching color palette */
@@ -210,3 +206,59 @@ body.admin-dashboard {
 .modal-header { border-bottom: 2px solid var(--color-ethereal); padding: 20px 24px; }
 .modal-body { padding: 24px; }
 .modal-footer { border-top: 2px solid var(--color-ethereal); padding: 16px 24px; }
+
+/* Grade System Styles */
+.grades-scroll-container {
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-sage) var(--color-ethereal);
+}
+
+.grades-scroll-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.grades-scroll-container::-webkit-scrollbar-track {
+  background: var(--color-ethereal);
+  border-radius: 4px;
+}
+
+.grades-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--color-sage);
+  border-radius: 4px;
+}
+
+.grades-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--color-flora);
+}
+
+.grade-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.grade-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+/* Ensure proper text contrast for all form elements */
+.admin-dashboard .form-control,
+.admin-dashboard .form-select {
+  background-color: var(--color-ethereal) !important;
+  color: var(--color-bark) !important;
+  border-color: var(--color-sage) !important;
+}
+
+.admin-dashboard .form-control::placeholder {
+  color: var(--color-cliff) !important;
+  opacity: 0.7;
+}
+
+.admin-dashboard .form-control:focus,
+.admin-dashboard .form-select:focus {
+  background-color: var(--color-ethereal) !important;
+  color: var(--color-bark) !important;
+  border-color: var(--color-flora) !important;
+  box-shadow: 0 0 0 3px rgba(107, 95, 79, 0.1) !important;
+}

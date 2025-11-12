@@ -18,20 +18,20 @@
         </div>
 
         <div class="signup-container">
-            <h2>Create Your Account</h2>
+            <h2 style="color: var(--color-ethereal) !important;">Create Your Account</h2>
         <form action="/TCC/BackEnd/auth/signup.php" method="POST" enctype="multipart/form-data">
                 <div class="form-group">
-                    <input type="text" id="name" class="form-control" name="name" placeholder="Full Name" required>
+                    <input type="text" id="name" class="form-control" name="name" placeholder="Full Name" required style="color: var(--color-ethereal) !important;">
                     <div class="field-feedback" id="nameFeedback" style="color:#f8d7da;margin-top:6px;display:none;font-size:0.9rem"></div>
                 </div>
             
             <div class="form-group">
-                <input type="text" id="username" class="form-control" name="username" placeholder="Username" required>
+                <input type="text" id="username" class="form-control" name="username" placeholder="Username" required style="color: var(--color-ethereal) !important;">
                 <div class="field-feedback" id="usernameFeedback" style="color:#f8d7da;margin-top:6px;display:none;font-size:0.9rem"></div>
             </div>
             
             <div class="form-group">
-                <input type="password" id="password" class="form-control" name="password" placeholder="Password" required>
+                <input type="password" id="password" class="form-control" name="password" placeholder="Password" required style="color: var(--color-ethereal) !important;">
                 <div class="field-feedback" id="passwordFeedback" style="color:#f8d7da;margin-top:6px;display:none;font-size:0.9rem"></div>
             </div>
             
