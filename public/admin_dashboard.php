@@ -109,7 +109,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                     Signed in as <strong><?php echo htmlspecialchars($adminName); ?></strong>
                   </p>
                 </div>
-                <a href="/TCC/public/home.php" class="btn btn-outline-secondary">
+                <a href="/TCC/public/home.php" class="btn btn-primary" style="background-color: #28a745; border-color: #28a745; color: white; font-weight: 600; padding: 0.5rem 1.5rem;">
                   <i class="bi bi-arrow-left-circle me-1"></i>Switch to User View
                 </a>
               </div>
@@ -268,6 +268,13 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             ?>
 
           <?php elseif ($section === 'buildings'): ?>
+            <?php
+            // Load database connection early
+            require_once __DIR__ . '/../BackEnd/database/db.php';
+            $bPath = __DIR__ . '/../database/buildings.json';
+            $buildings = [];
+            if (file_exists($bPath)) { $buildings = json_decode(file_get_contents($bPath), true) ?: []; }
+            ?>
             <div class="info-card">
               <div class="card-header-modern">
                 <i class="bi bi-building"></i>
@@ -282,9 +289,6 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
               </div>
             </div>
             <?php
-            $bPath = __DIR__ . '/../database/buildings.json';
-            $buildings = [];
-            if (file_exists($bPath)) { $buildings = json_decode(file_get_contents($bPath), true) ?: []; }
             // paginate buildings (convert assoc -> list of entries)
             $bldPerPage = 5;
             $bldPage = isset($_GET['bld_page']) ? max(1, intval($_GET['bld_page'])) : 1;
@@ -330,7 +334,6 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             // Get all unique sections from user_assignments
             $availableSections = [];
             try {
-              require_once __DIR__ . '/../BackEnd/database/db.php';
               $connSections = Database::getInstance()->getConnection();
               $sectionsQuery = $connSections->query("SELECT DISTINCT year, section FROM user_assignments ORDER BY year, section");
               if ($sectionsQuery) {

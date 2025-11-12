@@ -144,7 +144,7 @@ $conn = Database::getInstance()->getConnection();
                   Manage user assignments, financial status, and sanctions
                 </p>
               </div>
-              <a href="/TCC/public/admin_dashboard.php" class="btn btn-outline-secondary">
+              <a href="/TCC/public/admin_dashboard.php" class="btn btn-primary" style="background-color: #28a745; border-color: #28a745; color: white; font-weight: 600; padding: 0.5rem 1.5rem;">
                 <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
               </a>
             </div>
@@ -153,6 +153,11 @@ $conn = Database::getInstance()->getConnection();
           <?php if (isset($_GET['success'])): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
               <i class="bi bi-check-circle me-2"></i>User assignment updated successfully!
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          <?php elseif (isset($_GET['deleted'])): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+              <i class="bi bi-check-circle me-2"></i>User assignment deleted successfully!
               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
           <?php elseif (isset($_GET['error'])): ?>
@@ -316,7 +321,7 @@ $conn = Database::getInstance()->getConnection();
 
           // fetch page rows
           $ua = [];
-          $selSql = "SELECT username, year, section, department, payment, sanctions, owing_amount FROM user_assignments $where ORDER BY year, username LIMIT ? OFFSET ?";
+          $selSql = "SELECT id, username, year, section, department, payment, sanctions, owing_amount FROM user_assignments $where ORDER BY year, username LIMIT ? OFFSET ?";
           $selStmt = $conn->prepare($selSql);
           if ($selStmt) {
             if ($types !== '') {
@@ -422,6 +427,7 @@ $conn = Database::getInstance()->getConnection();
                     </tr>
                   <?php else: ?>
                     <?php foreach ($ua as $r): 
+                      $assignmentId = $r['id'] ?? null;
                       $fullName = $r['username'];
                       $year = $r['year'] ?? '';
                       $sectionName = $r['section'] ?? '';
@@ -479,15 +485,26 @@ $conn = Database::getInstance()->getConnection();
                           <?php endif; ?>
                         </td>
                         <td>
-                          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editUserModal"
-                            data-fullname="<?php echo htmlspecialchars($fullName); ?>"
-                            data-payment="<?php echo htmlspecialchars($payment); ?>"
-                            data-sanctions="<?php echo htmlspecialchars($sanctions); ?>"
-                            data-department="<?php echo htmlspecialchars($department); ?>"
-                            data-owing="<?php echo htmlspecialchars($owingAmount); ?>"
-                          >
-                            <i class="bi bi-pencil"></i> Edit
-                          </button>
+                          <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editUserModal"
+                              data-fullname="<?php echo htmlspecialchars($fullName); ?>"
+                              data-payment="<?php echo htmlspecialchars($payment); ?>"
+                              data-sanctions="<?php echo htmlspecialchars($sanctions); ?>"
+                              data-department="<?php echo htmlspecialchars($department); ?>"
+                              data-owing="<?php echo htmlspecialchars($owingAmount); ?>"
+                            >
+                              <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <?php if ($assignmentId): ?>
+                            <form method="post" action="/TCC/BackEnd/admin/manage_users.php" onsubmit="return confirm('Are you sure you want to delete this user assignment? This action cannot be undone.');" style="display:inline;">
+                              <input type="hidden" name="action" value="delete" />
+                              <input type="hidden" name="id" value="<?php echo (int)$assignmentId; ?>" />
+                              <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i> Delete
+                              </button>
+                            </form>
+                            <?php endif; ?>
+                          </div>
                         </td>
                       </tr>
                     <?php endforeach; ?>

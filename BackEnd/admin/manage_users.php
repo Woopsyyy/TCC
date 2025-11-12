@@ -8,7 +8,39 @@ $conn = Database::getInstance()->getConnection();
 
 $action = $_POST['action'] ?? 'assign';
 
-if ($action === 'update') {
+if ($action === 'delete') {
+	// Delete user assignment
+	$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+	if ($id <= 0) { header('Location: /TCC/public/user_management.php?error=invalid_id'); exit(); }
+	
+	// Get assignment info for audit log
+	$sel = $conn->prepare("SELECT username, year, section FROM user_assignments WHERE id = ? LIMIT 1");
+	$sel->bind_param('i', $id);
+	$sel->execute();
+	$res = $sel->get_result();
+	$assignmentInfo = $res->fetch_assoc();
+	$sel->close();
+	
+	// Delete the assignment
+	$stmt = $conn->prepare("DELETE FROM user_assignments WHERE id = ?");
+	$stmt->bind_param('i', $id);
+	$stmt->execute();
+	$stmt->close();
+	
+	// Audit log
+	$a = $_SESSION['username'] ?? null;
+	$act = 'delete';
+	$t = 'user_assignments';
+	$id_s = (string)$id;
+	$details = "deleted user_assignment for " . ($assignmentInfo['username'] ?? 'unknown') . " (year: " . ($assignmentInfo['year'] ?? '') . ", section: " . ($assignmentInfo['section'] ?? '') . ")";
+	$l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
+	$l->bind_param('sssss', $a, $act, $t, $id_s, $details);
+	$l->execute();
+	$l->close();
+	
+	header('Location: /TCC/public/user_management.php?deleted=1'); exit();
+	
+} else if ($action === 'update') {
 		// update existing user's payment/sanctions/department by full_name
 		$full_name = trim($_POST['full_name'] ?? '');
 		// If admin selected an existing user, prefer that canonical fullname and id
