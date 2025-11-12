@@ -642,6 +642,17 @@ function formatOrdinal($number) {
               } catch (Throwable $ex) {
                 // Silently fail if grades table doesn't exist or error occurs
               }
+              if (empty($studentGrades)):
+              ?>
+              <div class="info-card mt-3">
+                <div class="card-header-modern">
+                  <i class="bi bi-journal-x"></i>
+                  <h3>My Grades</h3>
+                </div>
+                <p class="text-muted mb-0">No grade records are available yet. Please check back later.</p>
+              </div>
+              <?php
+              endif;
               ?>
             </div>
           </div>
