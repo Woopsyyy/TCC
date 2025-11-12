@@ -939,7 +939,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                 continue;
               }
             ?>
-            <div class="grade-year-card">
+            <div class="info-card grade-year-card">
               <?php $collapseId = 'gradeYearCollapse' . $yearNum; ?>
               <button class="grade-year-header" type="button" data-bs-toggle="collapse" data-bs-target="#<?php echo $collapseId; ?>" aria-expanded="<?php echo ($selectedStudentId ? 'true' : 'false'); ?>" aria-controls="<?php echo $collapseId; ?>">
                 <div class="d-flex align-items-center gap-2">
