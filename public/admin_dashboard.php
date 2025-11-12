@@ -357,33 +357,33 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
             ?>
             <div class="buildings-grid mt-3">
               <div class="info-card buildings-card">
-                <div class="card-header-modern">
-                  <i class="bi bi-building-check"></i>
-                  <h3>Configured Buildings</h3>
-                </div>
+              <div class="card-header-modern">
+                <i class="bi bi-building-check"></i>
+                <h3>Configured Buildings</h3>
+              </div>
                 <ul class="list-group">
                   <?php if (empty($bEntries)): ?><li class="list-group-item text-muted">No buildings configured.</li><?php endif; ?>
                   <?php foreach ($bldSlice as $ent): $bname = $ent['name']; $binfo = $ent['info']; ?>
                     <li class="list-group-item"><strong>Building <?php echo htmlspecialchars($bname); ?></strong> — Floors: <?php echo (int)$binfo['floors']; ?>, Rooms/floor: <?php echo (int)$binfo['rooms']; ?></li>
                   <?php endforeach; ?>
                 </ul>
-                <?php if ($bldTotalPages > 1): ?>
-                <nav class="mt-2" aria-label="Buildings pages">
-                  <ul class="pagination pagination-sm">
-                    <?php
-                    $baseParams = $_GET; unset($baseParams['bld_page']);
-                    $prevPage = max(1, $bldPage-1); $nextPage = min($bldTotalPages, $bldPage+1);
-                    $prevClass = ($bldPage <= 1) ? 'disabled' : '';
-                    $nextClass = ($bldPage >= $bldTotalPages) ? 'disabled' : '';
-                    $baseParams['bld_page'] = $prevPage; echo '<li class="page-item ' . $prevClass . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($baseParams)) . '" aria-label="Previous buildings page">&lt;</a></li>';
-                    $showPages = min(5, $bldTotalPages);
-                    for ($p = 1; $p <= $showPages; $p++) { $baseParams['bld_page'] = $p; $qstr = htmlspecialchars(http_build_query($baseParams)); $isActive = ($p === $bldPage); $active = $isActive ? ' active' : ''; $aria = $isActive ? ' aria-current="page"' : ''; echo '<li class="page-item' . $active . '"><a class="page-link" href="?' . $qstr . '" aria-label="Buildings page ' . $p . '"' . $aria . '>' . $p . '</a></li>'; }
-                    $baseParams['bld_page'] = $nextPage; echo '<li class="page-item ' . $nextClass . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($baseParams)) . '" aria-label="Next buildings page">&gt;</a></li>';
-                    ?>
-                  </ul>
-                </nav>
-                <?php endif; ?>
-              </div>
+              <?php if ($bldTotalPages > 1): ?>
+              <nav class="mt-2" aria-label="Buildings pages">
+                <ul class="pagination pagination-sm">
+                  <?php
+                  $baseParams = $_GET; unset($baseParams['bld_page']);
+                  $prevPage = max(1, $bldPage-1); $nextPage = min($bldTotalPages, $bldPage+1);
+                  $prevClass = ($bldPage <= 1) ? 'disabled' : '';
+                  $nextClass = ($bldPage >= $bldTotalPages) ? 'disabled' : '';
+                  $baseParams['bld_page'] = $prevPage; echo '<li class="page-item ' . $prevClass . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($baseParams)) . '" aria-label="Previous buildings page">&lt;</a></li>';
+                  $showPages = min(5, $bldTotalPages);
+                  for ($p = 1; $p <= $showPages; $p++) { $baseParams['bld_page'] = $p; $qstr = htmlspecialchars(http_build_query($baseParams)); $isActive = ($p === $bldPage); $active = $isActive ? ' active' : ''; $aria = $isActive ? ' aria-current="page"' : ''; echo '<li class="page-item' . $active . '"><a class="page-link" href="?' . $qstr . '" aria-label="Buildings page ' . $p . '"' . $aria . '>' . $p . '</a></li>'; }
+                  $baseParams['bld_page'] = $nextPage; echo '<li class="page-item ' . $nextClass . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($baseParams)) . '" aria-label="Next buildings page">&gt;</a></li>';
+                  ?>
+                </ul>
+              </nav>
+              <?php endif; ?>
+            </div>
               <div class="info-card buildings-card">
                 <div class="card-header-modern">
                   <i class="bi bi-list-check"></i>
@@ -542,62 +542,62 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
                 <i class="bi bi-pencil-square"></i>
                 <h3>Edit Section Building &amp; Room Assignment</h3>
               </div>
-              <form class="admin-user-assign-form" action="/TCC/BackEnd/admin/manage_section_assignments.php" method="post">
+                <form class="admin-user-assign-form" action="/TCC/BackEnd/admin/manage_section_assignments.php" method="post">
                 <input type="hidden" name="action" value="update" />
                 <input type="hidden" name="id" value="<?php echo (int)$editSectionRow['id']; ?>" />
-                <div class="row g-3">
-                  <div class="col-md-3">
-                    <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
-                      <select name="year" class="form-select form-select-lg">
+                  <div class="row g-3">
+                    <div class="col-md-3">
+                      <div class="admin-form-group">
+                        <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
+                        <select name="year" class="form-select form-select-lg">
                         <option value="1" <?php echo ($editSectionRow['year']=='1')?'selected':'';?>>1st Year</option>
                         <option value="2" <?php echo ($editSectionRow['year']=='2')?'selected':'';?>>2nd Year</option>
                         <option value="3" <?php echo ($editSectionRow['year']=='3')?'selected':'';?>>3rd Year</option>
                         <option value="4" <?php echo ($editSectionRow['year']=='4')?'selected':'';?>>4th Year</option>
-                      </select>
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                  <div class="col-md-3">
-                    <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-people"></i> Section Name</label>
+                    <div class="col-md-3">
+                      <div class="admin-form-group">
+                        <label class="admin-form-label"><i class="bi bi-people"></i> Section Name</label>
                       <input name="section" class="form-control form-control-lg" value="<?php echo htmlspecialchars($editSectionRow['section']); ?>" required/>
+                      </div>
                     </div>
-                  </div>
-                  <div class="col-md-2">
-                    <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-building"></i> Building</label>
-                      <select name="building" class="form-select form-select-lg">
-                        <?php foreach (array_keys($buildings) as $bn): ?>
+                    <div class="col-md-2">
+                      <div class="admin-form-group">
+                        <label class="admin-form-label"><i class="bi bi-building"></i> Building</label>
+                        <select name="building" class="form-select form-select-lg">
+                          <?php foreach (array_keys($buildings) as $bn): ?>
                           <option <?php echo ($editSectionRow['building']===$bn)?'selected':'';?>><?php echo htmlspecialchars($bn); ?></option>
-                        <?php endforeach; ?>
-                      </select>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                  <div class="col-md-2">
-                    <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-layers"></i> Floor</label>
+                    <div class="col-md-2">
+                      <div class="admin-form-group">
+                        <label class="admin-form-label"><i class="bi bi-layers"></i> Floor</label>
                       <input name="floor" type="number" class="form-control form-control-lg" value="<?php echo (int)$editSectionRow['floor']; ?>" min="1" required/>
+                      </div>
                     </div>
-                  </div>
-                  <div class="col-md-2">
-                    <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-door-closed"></i> Room</label>
+                    <div class="col-md-2">
+                      <div class="admin-form-group">
+                        <label class="admin-form-label"><i class="bi bi-door-closed"></i> Room</label>
                       <input name="room" class="form-control form-control-lg" value="<?php echo htmlspecialchars($editSectionRow['room']); ?>" required/>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div class="row g-3 mt-2">
-                  <div class="col-md-12">
-                    <button type="submit" class="btn btn-primary btn-lg">
+                  <div class="row g-3 mt-2">
+                    <div class="col-md-12">
+                      <button type="submit" class="btn btn-primary btn-lg">
                       <i class="bi bi-check-circle me-2"></i>Update Section Assignment
-                    </button>
+                      </button>
                     <a href="/TCC/public/admin_dashboard.php?section=buildings" class="btn btn-secondary btn-lg ms-2">
                       <i class="bi bi-x-circle me-2"></i>Cancel
                     </a>
+                    </div>
                   </div>
-                </div>
-              </form>
-            </div>
+                </form>
+              </div>
             <?php else: ?>
             <div class="info-card mt-3">
               <div class="card-header-modern">
@@ -661,7 +661,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
               </form>
             </div>
             <?php endif; ?>
- 
+
           <?php elseif ($section === 'projects'): ?>
             <div class="info-card">
               <div class="card-header-modern">
@@ -940,15 +940,11 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
               }
             ?>
             <div class="info-card grade-year-card">
-              <?php $collapseId = 'gradeYearCollapse' . $yearNum; ?>
-              <button class="grade-year-header" type="button" data-bs-toggle="collapse" data-bs-target="#<?php echo $collapseId; ?>" aria-expanded="<?php echo ($selectedStudentId ? 'true' : 'false'); ?>" aria-controls="<?php echo $collapseId; ?>">
-                <div class="d-flex align-items-center gap-2">
-                  <i class="bi bi-calendar-year"></i>
-                  <span><?php echo $yearNum; ?><?php echo $yearNum == '1' ? 'st' : ($yearNum == '2' ? 'nd' : ($yearNum == '3' ? 'rd' : 'th')); ?> Year</span>
-                </div>
-                <i class="bi bi-chevron-down"></i>
-              </button>
-              <div id="<?php echo $collapseId; ?>" class="collapse <?php echo ($selectedStudentId ? 'show' : ''); ?> grade-year-body">
+              <div class="card-header-modern">
+                <i class="bi bi-calendar-year"></i>
+                <h3><?php echo $yearNum; ?><?php echo $yearNum == '1' ? 'st' : ($yearNum == '2' ? 'nd' : ($yearNum == '3' ? 'rd' : 'th')); ?> Year</h3>
+              </div>
+              <div class="grade-year-body">
                 <div class="grade-student-list">
                   <?php $studentIndex = 0; foreach ($studentGroups as $groupKey => $group): ?>
                     <?php
@@ -1061,14 +1057,6 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
       document.addEventListener('DOMContentLoaded', ()=>{
         var t=document.querySelectorAll('[data-bs-toggle="tooltip"]');Array.from(t).forEach(el=>new bootstrap.Tooltip(el));
         // Rotate chevron icons on collapse show/hide
-        document.querySelectorAll('.grade-year-header').forEach(function(btn){
-          var target = btn.getAttribute('data-bs-target');
-          var collapseEl = document.querySelector(target);
-          if (!collapseEl) return;
-          collapseEl.addEventListener('show.bs.collapse', function(){ btn.classList.add('open'); });
-          collapseEl.addEventListener('hide.bs.collapse', function(){ btn.classList.remove('open'); });
-        });
-
         // Rotate chevrons for student sections
         document.querySelectorAll('.student-grade-header').forEach(function(btn){
           var target = btn.getAttribute('data-bs-target');

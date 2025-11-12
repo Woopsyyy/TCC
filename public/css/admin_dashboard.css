@@ -381,34 +381,6 @@ body.admin-dashboard {
 
 .grade-year-card {
   padding: 0;
-  overflow: hidden;
-}
-
-.grade-year-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: var(--color-ethereal);
-  border: none;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--color-bark);
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.grade-year-header i.bi-chevron-down {
-  transition: transform 0.2s ease;
-}
-
-.grade-year-header.open i.bi-chevron-down {
-  transform: rotate(180deg);
-}
-
-.grade-year-header:hover {
-  background: var(--color-sage);
 }
 
 .grade-year-body {
