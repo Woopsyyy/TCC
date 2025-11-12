@@ -12,6 +12,7 @@ $full_name = $_SESSION['full_name'] ?? $_SESSION['username'];
 
 // default view: records on home
 $view = isset($_GET['view']) ? $_GET['view'] : 'records';
+require_once __DIR__ . '/../BackEnd/database/db.php';
 $conn = Database::getInstance()->getConnection();
 $username = $_SESSION['username'];
 $stmt = $conn->prepare("SELECT image_path FROM users WHERE username = ?");
