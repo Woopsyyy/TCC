@@ -1,240 +1,120 @@
-# 🎓 TCC Account Management System
+# 🎓 TCC Campus Management Platform
 
-[![PHP](https://img.shields.io/badge/PHP-8.0+-blue.svg)](https://www.php.net/)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0+-orange.svg)](https://www.mysql.com/)
-[![Bootstrap](https://img.shields.io/badge/Bootstrap-5.0+-purple.svg)](https://getbootstrap.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+A full-stack PHP + MySQL application that centralizes daily operations for Talisay City College. The suite covers authentication, student records, academic sections, facilities, announcements, projects, and an all-new admin settings hub for data backups.
 
-> A comprehensive web-based management platform for Talisay City College (TCC), featuring secure user authentication, role-based access control, academic record management, financial tracking, facility management, and administrative tools for seamless educational institution operations.
+---
 
-## 🌟 Overview
+## 🚀 What’s Inside
+- **Role-aware dashboards** for admins, teachers, and students.
+- **Student & section management** with grade tracking and building assignments.
+- **Content tools** for announcements, projects, and transparency updates.
+- **Facilities module** for buildings, floors, and room allocations.
+- **Database backup center** allowing instant exports and scheduled jobs.
 
-The TCC Account Management System is a robust web application built to streamline comprehensive management within an educational institution. It provides a secure platform for user registration, login, and role-based interactions while managing academic records, financial information, facility assignments, announcements, projects, and administrative oversight, ensuring data integrity and user privacy through modern web technologies.
+---
 
-## ✨ Features
-
-### 🔐 Authentication & Security
-
-- **Secure Login System**: Password hashing with PHP's `password_hash()` for enhanced security
-- **User Registration**: Seamless signup with profile image upload capability
-- **Session Management**: Robust session handling with automatic logout and cookie management
-- **Role-Based Access Control**: Three distinct user roles (Admin, Teacher, Student) with specific permissions
-
-### 👤 User Management
-
-- **Profile Customization**: Users can upload and display custom profile images
-- **Admin Dashboard**: Comprehensive user verification and role assignment interface
-- **User Verification**: Admin-controlled verification process for new accounts
-- **Dynamic Role Assignment**: Flexible role changes (Student ↔ Teacher ↔ Admin)
-- **User Search & Filtering**: Advanced search functionality for user management
-- **Financial Tracking**: Payment status, sanctions, and owing amount management
-
-### 📢 Content Management
-
-- **Announcements System**: Create, edit, and manage system-wide announcements
-- **Project Management**: Track project budgets, completion status, and timelines
-- **Building & Facility Management**: Manage campus buildings, floors, and room assignments
-- **Section Assignments**: Assign classes to specific buildings and rooms
-
-### 📊 Academic Records
-
-- **Student Records**: Year, section, department, and enrollment tracking
-- **Financial Records**: Payment status, sanctions, and outstanding balances
-- **Assignment Mapping**: Link user accounts to academic records
-- **Audit Logging**: Complete administrative action tracking
-
-### 📊 Dashboards
-
-- **Admin Dashboard**:
-  - View and manage all users
-  - Verify user accounts
-  - Assign and modify user roles
-  - Manage announcements, projects, and facilities
-  - Real-time user status updates
-  - Audit log monitoring
-- **Teacher Dashboard**:
-  - Personalized welcome interface
-  - Class management tools (framework ready)
-  - Student interaction features
-- **Student Dashboard**:
-  - Enrollment tracking
-  - Class viewing capabilities
-  - Financial status overview
-  - Personalized learning space
-
-### 🗄️ Database Integration
-
-- **MySQL Database**: Relational database with optimized schema
-- **Multiple Tables**: users, announcements, buildings, projects, section_assignments, user_assignments, audit_log
-- **Singleton Database Class**: Efficient connection management and resource handling
-- **Prepared Statements**: SQL injection prevention through parameterized queries
-- **Dynamic Schema Updates**: Automatic column additions for feature expansion
-- **Foreign Key Relationships**: Data integrity through proper table relationships
-
-### 🎨 User Interface
-
-- **Responsive Design**: Bootstrap-powered mobile-friendly interface
-- **Custom Styling**: Tailored CSS for login, signup, and dashboard pages
-- **Interactive Elements**: Real-time form validation and image preview
-- **Consistent Branding**: TCC-themed design with professional aesthetics
-- **Modern UI Components**: Cards, modals, tooltips, and navigation elements
-
-### 🔧 Backend Features
-
-- **Modular Architecture**: Organized file structure with separate concerns
-- **Error Handling**: Comprehensive error management and user feedback
-- **File Upload System**: Secure image handling with validation
-- **Authentication Classes**: Object-oriented authentication logic
-- **Admin API Endpoints**: RESTful endpoints for administrative operations
-- **Migration Tools**: JSON to database migration utilities
-
-## 🛠️ Tech Stack
-
-- **Backend**: PHP 8.0+ with OOP principles
-- **Database**: MySQL 8.0+ with InnoDB engine
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **Framework**: Bootstrap 5.0+ for responsive design
-- **Server**: Apache/XAMPP for local development
-- **Security**: Password hashing, prepared statements, session security
-
-## 📦 Installation
-
-### Prerequisites
-
-- XAMPP (or similar Apache/MySQL stack)
-- PHP 8.0 or higher
-- MySQL 8.0 or higher
-- Modern web browser
-
-### Setup Steps
-
-1. **Clone the Repository**
-
-   ```bash
-   git clone https://github.com/yourusername/tcc-account-management.git
-   cd tcc-account-management
-   ```
-
-2. **Database Setup**
-
-   - Start XAMPP and ensure Apache and MySQL are running
-   - Import `database/account_manager.sql` into MySQL
-   - Optionally run `database/update_users_table.sql` for additional columns
-
-3. **Configuration**
-
-   - Ensure the project is placed in `C:/xampp/htdocs/TCC/`
-   - Update database credentials in `BackEnd/database/db.php` if needed
-
-## 🚀 Usage
-
-### For New Users
-
-1. Visit the signup page (`signup.php`)
-2. Fill in your details and upload a profile image
-3. Submit the form to create your account
-4. Wait for admin verification
-
-### For Existing Users
-
-1. Navigate to the login page (`index.html`)
-2. Enter your username and password
-3. Access your role-specific dashboard
-
-### Key Relationships
-
-- **id**: Unique identifier for each user
-- **username**: Unique login identifier
-- **password**: Hashed password for security
-- **role**: Determines user permissions and dashboard access
-- **verified**: Admin-controlled verification status
-
-## 🗄️ Database Schema
-
-The system uses a MySQL database with the following tables:
-
-### Core Tables
-
-- **`users`** - User accounts (admin, teacher, student)
-  - `id`, `username`, `password`, `full_name`, `role`, `verified`, `image_path`
-- **`announcements`** - System announcements
-  - `id`, `title`, `content`, `year`, `department`, `date`
-- **`projects`** - Project information
-  - `id`, `name`, `budget`, `started`, `completed`
-- **`buildings`** - Building details
-  - `id`, `name`, `floors`, `rooms_per_floor`
-- **`section_assignments`** - Section to building/room assignments
-  - `id`, `year`, `section`, `building`, `floor`, `room`
-- **`user_assignments`** - User academic and financial records
-  - `id`, `user_id`, `username`, `year`, `section`, `department`, `payment`, `sanctions`, `owing_amount`
-- **`audit_log`** - Admin action logs
-  - `id`, `admin_user`, `action`, `target_table`, `target_id`, `details`, `created_at`
-
-## 📁 Project Structure
-
+## 📁 Project Layout
 ```
 TCC/
 ├── BackEnd/
 │   ├── admin/
-│   │   ├── delete_announcement.php    # Announcement deletion
-│   │   ├── get_announcements.php      # Announcement retrieval API
-│   │   ├── manage_announcement.php    # Announcement CRUD operations
-│   │   ├── manage_buildings.php       # Building management
-│   │   ├── manage_projects.php        # Project management
-│   │   ├── manage_section_assignments.php # Section assignment management
-│   │   ├── manage_users.php           # User management operations
-│   │   ├── map_assignment.php         # User assignment mapping
-│   │   ├── save_announcement.php      # Announcement saving
-│   │   └── user_search.php            # User search API
+│   │   ├── backup_settings.php         # Runs manual & scheduled backups
+│   │   ├── manage_sections.php         # CRUD for sections & assignments
+│   │   ├── manage_projects.php         # Campus project workflows
+│   │   ├── manage_buildings.php        # Building/facility maintenance
+│   │   ├── manage_users.php            # Admin actions for accounts
+│   │   └── settings_section.php        # Partial that renders the admin settings UI
 │   ├── auth/
-│   │   ├── login.php                  # Authentication logic
-│   │   ├── signup.php                 # User registration
-│   │   ├── logout.php                 # Session termination
-│   │   └── update_profile.php         # Profile updates
+│   │   ├── login.php | signup.php      # Authentication endpoints
+│   │   └── logout.php                  # Session teardown
 │   ├── database/
-│   │   └── db.php                     # Database connection class
-│   ├── debug/                         # Debugging utilities
-│   └── setup_admin.php                # Admin account setup
-├── database/
-│   ├── account_manager.sql            # Main database schema
-│   ├── announcements.json             # Sample announcements
-│   ├── buildings.json                 # Sample building data
-│   ├── projects.json                  # Sample project data
-│   ├── schema.sql                     # Complete schema documentation
-│   ├── section_assignments.json       # Sample section assignments
-│   ├── update_users_table.sql         # Schema updates
-│   └── user_assignments.json          # Sample user assignments
+│   │   └── db.php                      # Singleton DB connector & auto-migrations
+│   └── helpers/, debug/, migrations    # Supporting scripts and utilities
 ├── public/
-│   ├── admin/
-│   │   └── unmapped_assignments.php   # Unmapped assignment management
-│   ├── css/
-│   │   ├── admin_dashboard.css        # Admin dashboard styling
-│   │   ├── bootstrap.min.css          # Bootstrap framework
-│   │   ├── home.css                   # Main application styles
-│   │   ├── login.css                  # Login page styling
-│   │   └── signup.css                 # Signup page styling
-│   ├── images/                        # Static images and assets
-│   ├── index.html                     # Login page
-│   ├── signup.php                     # Registration page
-│   ├── home.php                       # Main dashboard (role-based)
-│   ├── admin_dashboard.php            # Admin management interface
-│   ├── teacher_dashboard.php          # Teacher interface
-│   ├── student_dashboard.php          # Student interface
-│   ├── user_management.php            # User management interface
-│   ├── settings.php                   # User settings page
-│   ├── records.php                    # Records viewing page
-│   ├── transparency.php               # Transparency/projects page
-│   └── signup.php                     # User registration
-├── color pallete.jpg                  # Design color reference
-├── LICENSE                            # Project license
-├── README.md                          # This documentation
-└── TODO.md                            # Development task tracking
+│   ├── admin_dashboard.php             # Main admin console (announcements → backups)
+│   ├── home.php                        # Role router after login
+│   ├── teacher_dashboard.php           # Teacher UX (class tools placeholder)
+│   ├── student_dashboard.php           # Student UX (records, finances)
+│   ├── css/                            # Bootstrap + custom styles
+│   ├── js/ (if present)                # Client behaviour helpers
+│   └── assets/                         # Images and uploads
+├── database/
+│   ├── account_manager.sql             # Primary schema seed
+│   ├── *.json                          # Legacy data snapshots
+│   └── README.md                       # Database-specific usage notes
+└── README.md                           # You are here
 ```
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+> Tip: `BackEnd/backups/` is created automatically when you run the admin backup tools. Add it to your VCS ignore list if you don’t want dumps tracked.
 
 ---
 
-**Built with ❤️ for Talisay City College**
+## 🧰 Technology Stack
+- **Language:** PHP 8.2+
+- **Database:** MySQL (InnoDB)
+- **Server:** Apache via XAMPP (Windows dev target)
+- **Frontend:** HTML5, Bootstrap 5, custom SCSS/CSS
+- **Security:** Password hashing, prepared statements, session hardening
+
+---
+
+## ⚙️ Getting Started
+
+### 1. Prerequisites
+- XAMPP (Apache + MySQL)
+- PHP 8.2 or higher (bundled with modern XAMPP builds)
+- Composer (optional, for future package management)
+
+### 2. Install Source
+```bash
+# place inside your htdocs directory
+cd C:/xampp/htdocs
+git clone <repo-url> TCC
+cd TCC
+```
+
+### 3. Configure Database
+1. Start Apache and MySQL in XAMPP.
+2. Import `database/account_manager.sql` using phpMyAdmin or the MySQL CLI.
+3. Update credentials in `BackEnd/database/db.php` only if you don’t use the default `root`/empty password setup.
+4. First load of the site auto-creates any missing tables (see `Database::ensureTablesExist`).
+
+### 4. Launch
+- Visit `http://localhost/TCC/public/index.html` to sign in.
+- An initial admin account can be created via `BackEnd/setup_admin.php` if needed.
+
+---
+
+## 🖥️ Admin Console Modules (`admin_dashboard.php`)
+| Module | Description |
+| ------ | ----------- |
+| Announcements | Create and pin notices filtered by year/department. |
+| Buildings & Sections | Maintain campus buildings, assign rooms, and map class sections. |
+| Projects | Track campus project budgets and milestones. |
+| Manage Students | Control enrolments, financial standing, sanctions, and assignments. |
+| Grade System | Log prelim/midterm/final grades with year/section filters. |
+| Settings | Trigger manual database backups, enable daily scheduling, and download recent dumps. |
+
+---
+
+## 💾 Database Backups
+1. Navigate to **Settings** within the admin dashboard.
+2. Use **Run Backup** for an immediate `.sql` export (stored under `BackEnd/backups/`).
+3. Toggle **Enable daily backup** and set a time to save a schedule.
+4. Hook an OS task/cron to call `http://localhost/TCC/BackEnd/admin/backup_settings.php?action=run_schedule` near the configured time for unattended runs.
+
+---
+
+## 🧪 QA & Development Notes
+- PHP errors are logged through the default XAMPP configuration; supplement with `error_log()` when tracing.
+- JSON fallback data (`database/*.json`) mirrors legacy content used during migrations—handy for seeding or testing.
+- Keep an eye on automatic schema alterations performed in `db.php` if you rename columns.
+
+---
+
+## 📜 License
+Released under the MIT License. See [`LICENSE`](LICENSE) for full text.
+
+---
+
+> Built with ❤️ for Talisay City College – empowering administrators, teachers, and students alike.
