@@ -50,6 +50,61 @@ if ($action === 'delete') {
   header('Location: /TCC/public/admin_dashboard.php?section=grade_system&success=deleted'); 
   exit();
   
+} else if ($action === 'delete_all') {
+  // Delete all grades for a student
+  $gradeIds = isset($_POST['grade_ids']) && is_array($_POST['grade_ids']) ? $_POST['grade_ids'] : [];
+  $studentName = isset($_POST['student_name']) ? trim($_POST['student_name']) : 'unknown';
+  
+  if (empty($gradeIds)) {
+    header('Location: /TCC/public/admin_dashboard.php?section=grade_system&error=no_grades'); 
+    exit();
+  }
+  
+  // Validate and sanitize grade IDs
+  $validIds = [];
+  foreach ($gradeIds as $id) {
+    $id = intval($id);
+    if ($id > 0) {
+      $validIds[] = $id;
+    }
+  }
+  
+  if (empty($validIds)) {
+    header('Location: /TCC/public/admin_dashboard.php?section=grade_system&error=invalid_ids'); 
+    exit();
+  }
+  
+  // Get grade info for audit log (get first grade for reference)
+  $firstId = $validIds[0];
+  $sel = $conn->prepare("SELECT username, year, semester, subject FROM student_grades WHERE id = ? LIMIT 1");
+  $sel->bind_param('i', $firstId);
+  $sel->execute();
+  $res = $sel->get_result();
+  $gradeInfo = $res->fetch_assoc();
+  $sel->close();
+  
+  // Delete all grades
+  $placeholders = str_repeat('?,', count($validIds) - 1) . '?';
+  $stmt = $conn->prepare("DELETE FROM student_grades WHERE id IN ($placeholders)");
+  $stmt->bind_param(str_repeat('i', count($validIds)), ...$validIds);
+  $stmt->execute();
+  $deletedCount = $stmt->affected_rows;
+  $stmt->close();
+  
+  // Audit log
+  $a = $_SESSION['username'] ?? null;
+  $act = 'delete';
+  $t = 'student_grades';
+  $id_s = implode(',', $validIds);
+  $details = "deleted all grades ($deletedCount records) for " . htmlspecialchars($studentName);
+  $l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
+  $l->bind_param('sssss', $a, $act, $t, $id_s, $details);
+  $l->execute();
+  $l->close();
+  
+  header('Location: /TCC/public/admin_dashboard.php?section=grade_system&success=deleted_all'); 
+  exit();
+  
 } else if ($action === 'update') {
   // Update existing grade
   $id = isset($_POST['id']) ? intval($_POST['id']) : 0;

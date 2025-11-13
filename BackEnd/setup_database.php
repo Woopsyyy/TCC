@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/database/db.php';
+require_once __DIR__ . '/helpers/school_id.php';
 
 header('Content-Type: text/html; charset=utf-8');
 ?>
@@ -84,6 +85,16 @@ header('Content-Type: text/html; charset=utf-8');
             $conn = $db->getConnection();
             
             echo '<div class="success">✓ Database connection successful!</div>';
+
+            // Ensure school_id column exists on users table
+            $schoolColumn = $conn->query("SHOW COLUMNS FROM users LIKE 'school_id'");
+            if ($schoolColumn && $schoolColumn->num_rows === 0) {
+                if ($conn->query("ALTER TABLE users ADD COLUMN school_id VARCHAR(20) UNIQUE AFTER full_name")) {
+                    echo '<div class="info">ℹ Added school_id column to users table.</div>';
+                } else {
+                    echo '<div class="error">✗ Failed to add school_id column: ' . htmlspecialchars($conn->error) . '</div>';
+                }
+            }
             
             // Read and execute schema.sql
             $schemaFile = __DIR__ . '/../database/schema.sql';
@@ -133,9 +144,10 @@ header('Content-Type: text/html; charset=utf-8');
             $checkAdmin = $conn->query("SELECT id FROM users WHERE username = 'admin'");
             if ($checkAdmin->num_rows == 0) {
                 $adminPassword = password_hash('admin123', PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, role) VALUES (?, ?, 'Administrator', 'admin')");
-                $stmt->bind_param('ss', $adminUsername, $adminPassword);
                 $adminUsername = 'admin';
+                $schoolIdAdmin = 'ADMIN - 0000';
+                $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, 'Administrator', 'admin', ?)");
+                $stmt->bind_param('sss', $adminUsername, $adminPassword, $schoolIdAdmin);
                 if ($stmt->execute()) {
                     echo '<div class="success">✓ Admin user created (username: admin, password: admin123)</div>';
                 } else {
@@ -144,6 +156,19 @@ header('Content-Type: text/html; charset=utf-8');
                 $stmt->close();
             } else {
                 echo '<div class="info">ℹ Admin user already exists</div>';
+            }
+
+            // Ensure existing users have school IDs
+            $missingIds = $conn->query("SELECT id, school_id, created_at FROM users WHERE school_id IS NULL OR school_id = ''");
+            if ($missingIds && $missingIds->num_rows > 0) {
+                while ($userRow = $missingIds->fetch_assoc()) {
+                    try {
+                        $newId = ensure_school_id_for_user($conn, $userRow);
+                        echo '<div class="info">ℹ Assigned school ID ' . htmlspecialchars($newId) . ' to user #' . htmlspecialchars($userRow['id']) . '.</div>';
+                    } catch (Exception $sidEx) {
+                        echo '<div class="error">✗ Failed to assign school ID for user #' . htmlspecialchars($userRow['id']) . ': ' . htmlspecialchars($sidEx->getMessage()) . '</div>';
+                    }
+                }
             }
             
             echo '<div class="success">✓ Setup completed! Executed ' . $successCount . ' statements successfully.</div>';

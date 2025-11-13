@@ -1,0 +1,26 @@
+{
+    "3|Altruism": {
+        "id": 1,
+        "year": "3",
+        "section": "Altruism",
+        "building": "C",
+        "floor": 3,
+        "room": "301"
+    },
+    "3|Devotion": {
+        "id": 9,
+        "year": "3",
+        "section": "Devotion",
+        "building": "C",
+        "floor": 1,
+        "room": "303"
+    },
+    "1|Benevolence": {
+        "id": 10,
+        "year": "1",
+        "section": "Benevolence",
+        "building": "A",
+        "floor": 1,
+        "room": "301"
+    }
+}

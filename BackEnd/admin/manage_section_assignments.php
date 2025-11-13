@@ -6,6 +6,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: /TCC/public/admin
 require_once __DIR__ . '/../database/db.php';
 $conn = Database::getInstance()->getConnection();
 
+// Ensure sections table exists
+$conn->query("CREATE TABLE IF NOT EXISTS sections (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  year VARCHAR(10) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_year_name (year, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 $action = $_POST['action'] ?? 'create';
 $year = trim($_POST['year'] ?? '');
 $sect = trim($_POST['section'] ?? '');
@@ -51,8 +60,20 @@ if ($action === 'update' && $id > 0) {
     exit(); 
   }
   
+  // Check if section exists in sections table
+  $sectionCheck = $conn->prepare("SELECT id FROM sections WHERE year = ? AND name = ? LIMIT 1");
+  $sectionCheck->bind_param('ss', $year, $sect);
+  $sectionCheck->execute();
+  $sectionResult = $sectionCheck->get_result();
+  if ($sectionResult->num_rows === 0) {
+    $sectionCheck->close();
+    header('Location: /TCC/public/admin_dashboard.php?section=buildings&error=section_not_found'); 
+    exit();
+  }
+  $sectionCheck->close();
+  
   $stmt = $conn->prepare("UPDATE section_assignments SET year=?, section=?, building=?, floor=?, room=? WHERE id=?");
-  $stmt->bind_param('ssissi', $year, $sect, $building, $floor, $room, $id);
+  $stmt->bind_param('sssisi', $year, $sect, $building, $floor, $room, $id);
   $stmt->execute();
   
   // Also update JSON backup
@@ -72,31 +93,58 @@ if ($year === '' || $sect === '' || $building === '' || $room === '') {
   exit(); 
 }
 
-// Save to database
-$stmt = $conn->prepare("INSERT INTO section_assignments (year, section, building, floor, room) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE building=VALUES(building), floor=VALUES(floor), room=VALUES(room)");
-$stmt->bind_param('ssiss', $year, $sect, $building, $floor, $room);
-$stmt->execute();
-
-// Get the ID of the inserted/updated record
-$insertId = $conn->insert_id;
-if ($insertId == 0) {
-  // If it was an update due to duplicate key, fetch the ID
-  $fetchStmt = $conn->prepare("SELECT id FROM section_assignments WHERE year = ? AND section = ? LIMIT 1");
-  $fetchStmt->bind_param('ss', $year, $sect);
-  $fetchStmt->execute();
-  $result = $fetchStmt->get_result();
-  if ($row = $result->fetch_assoc()) {
-    $insertId = $row['id'];
-  }
-  $fetchStmt->close();
+// Check if section exists in sections table
+$sectionCheck = $conn->prepare("SELECT id FROM sections WHERE year = ? AND name = ? LIMIT 1");
+$sectionCheck->bind_param('ss', $year, $sect);
+$sectionCheck->execute();
+$sectionResult = $sectionCheck->get_result();
+if ($sectionResult->num_rows === 0) {
+  $sectionCheck->close();
+  header('Location: /TCC/public/admin_dashboard.php?section=buildings&error=section_not_found'); 
+  exit();
 }
+$sectionCheck->close();
 
-// Also save to JSON as backup
-$path = __DIR__ . '/../../database/section_assignments.json';
-$data = [];
-if (file_exists($path)) { $data = json_decode(file_get_contents($path), true) ?: []; }
-$key = $year . '|' . $sect;
-$data[$key] = ['id'=>$insertId, 'year'=>$year, 'section'=>$sect, 'building'=>$building, 'floor'=>$floor, 'room'=>$room];
-file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT));
+try {
+  // Save to database
+  $stmt = $conn->prepare("INSERT INTO section_assignments (year, section, building, floor, room) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE building=VALUES(building), floor=VALUES(floor), room=VALUES(room)");
+  if (!$stmt) {
+    throw new Exception("Failed to prepare statement: " . $conn->error);
+  }
+  
+  $stmt->bind_param('sssis', $year, $sect, $building, $floor, $room);
+  if (!$stmt->execute()) {
+    throw new Exception("Failed to execute statement: " . $stmt->error);
+  }
 
-header('Location: /TCC/public/admin_dashboard.php?section=buildings&success=1'); exit();
+  // Get the ID of the inserted/updated record
+  $insertId = $conn->insert_id;
+  if ($insertId == 0) {
+    // If it was an update due to duplicate key, fetch the ID
+    $fetchStmt = $conn->prepare("SELECT id FROM section_assignments WHERE year = ? AND section = ? LIMIT 1");
+    if ($fetchStmt) {
+      $fetchStmt->bind_param('ss', $year, $sect);
+      $fetchStmt->execute();
+      $result = $fetchStmt->get_result();
+      if ($row = $result->fetch_assoc()) {
+        $insertId = $row['id'];
+      }
+      $fetchStmt->close();
+    }
+  }
+  
+  $stmt->close();
+
+  // Also save to JSON as backup
+  $path = __DIR__ . '/../../database/section_assignments.json';
+  $data = [];
+  if (file_exists($path)) { $data = json_decode(file_get_contents($path), true) ?: []; }
+  $key = $year . '|' . $sect;
+  $data[$key] = ['id'=>$insertId, 'year'=>$year, 'section'=>$sect, 'building'=>$building, 'floor'=>$floor, 'room'=>$room];
+  file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT));
+
+  header('Location: /TCC/public/admin_dashboard.php?section=buildings&success=1'); exit();
+} catch (Exception $e) {
+  error_log("Section assignment error: " . $e->getMessage());
+  header('Location: /TCC/public/admin_dashboard.php?section=buildings&error=dberror'); exit();
+}

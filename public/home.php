@@ -8,6 +8,7 @@ if (!isset($_SESSION['username'])) {
 
 // Prefer values saved in session to avoid extra DB queries
 $image = $_SESSION['image_path'] ?? '/TCC/public/images/sample.jpg';
+$schoolId = $_SESSION['school_id'] ?? '';
 $full_name = $_SESSION['full_name'] ?? $_SESSION['username'];
 
 // default view: records on home
@@ -15,12 +16,25 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'records';
 require_once __DIR__ . '/../BackEnd/database/db.php';
 $conn = Database::getInstance()->getConnection();
 $username = $_SESSION['username'];
-$stmt = $conn->prepare("SELECT image_path FROM users WHERE username = ?");
+$stmt = $conn->prepare("SELECT id, image_path, school_id, role, created_at FROM users WHERE username = ?");
 $stmt->bind_param("s", $username);
 $stmt->execute();
 $result = $stmt->get_result();
 $row = $result->fetch_assoc();
 $image = $row['image_path'] ?? '/TCC/public/images/sample.jpg';
+$userRole = $row['role'] ?? $_SESSION['role'] ?? 'student';
+if (empty($schoolId) && isset($row['school_id']) && $row['school_id'] !== '') {
+  $schoolId = $row['school_id'];
+  $_SESSION['school_id'] = $schoolId;
+} elseif (empty($schoolId) && $row) {
+  require_once __DIR__ . '/../BackEnd/helpers/school_id.php';
+  try {
+    $schoolId = ensure_school_id_for_user($conn, $row);
+    $_SESSION['school_id'] = $schoolId;
+  } catch (Throwable $th) {
+    $schoolId = '';
+  }
+}
 
 function formatOrdinal($number) {
   $number = intval($number);
@@ -47,9 +61,18 @@ function formatOrdinal($number) {
   <body>
     <div class="page-container">
       <aside class="sidebar">
+        <div class="sidebar-glass"></div>
         <div class="sidebar-top">
           <!-- user image as logo -->
-          <img src="<?php echo htmlspecialchars($image); ?>" alt="User" class="sidebar-logo" />
+          <div class="sidebar-profile-tile">
+            <img src="<?php echo htmlspecialchars($image); ?>" alt="User" class="sidebar-logo" />
+            <?php if (!empty($schoolId)): ?>
+              <span class="sidebar-school-id" title="School ID"><?php echo htmlspecialchars($schoolId); ?></span>
+            <?php endif; ?>
+            <?php if (!empty($userRole)): ?>
+              <span class="sidebar-role" title="Role"><?php echo htmlspecialchars(ucfirst($userRole)); ?></span>
+            <?php endif; ?>
+          </div>
         </div>
 
         <nav class="sidebar-nav" aria-label="Main navigation">
@@ -67,13 +90,19 @@ function formatOrdinal($number) {
               </a>
             </li>
             <li>
+              <a href="/TCC/public/home.php?view=grades" class="nav-link <?php echo ($view === 'grades') ? 'active' : '' ?>" data-bs-toggle="tooltip" data-bs-placement="right" title="Grades">
+                <i class="bi bi-journal-bookmark-fill"></i>
+                <span class="nav-label">Grades</span>
+              </a>
+            </li>
+            <li>
               <a href="/TCC/public/home.php?view=transparency" class="nav-link <?php echo ($view === 'transparency') ? 'active' : '' ?>" data-bs-toggle="tooltip" data-bs-placement="right" title="Transparency">
                 <i class="bi bi-graph-up"></i>
                 <span class="nav-label">Transparency</span>
               </a>
             </li>
             <li>
-              <a href="/TCC/public/settings.php" class="nav-link <?php echo ($view === 'settings') ? 'active' : '' ?>" data-bs-toggle="tooltip" data-bs-placement="right" title="Settings">
+              <a href="/TCC/public/home.php?view=settings" class="nav-link <?php echo ($view === 'settings') ? 'active' : '' ?>" data-bs-toggle="tooltip" data-bs-placement="right" title="Settings">
                 <i class="bi bi-gear-fill"></i>
                 <span class="nav-label">Settings</span>
               </a>
@@ -83,8 +112,9 @@ function formatOrdinal($number) {
 
         <div class="sidebar-bottom">
           <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
-            <a href="/TCC/public/admin_dashboard.php" class="btn admin-icon" title="Admin Dashboard" data-bs-toggle="tooltip" data-bs-placement="right">
-              <i class="bi bi-shield-check"></i>
+            <a href="/TCC/public/admin_dashboard.php" class="btn btn-switch-view sidebar-switch-btn" title="Switch to Admin Dashboard" data-bs-toggle="tooltip" data-bs-placement="right">
+              <i class="bi bi-shield-lock-fill"></i>
+              <span>Admin View</span>
             </a>
           <?php endif; ?>
           <a href="/TCC/BackEnd/auth/logout.php" class="btn logout-icon" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
@@ -93,9 +123,91 @@ function formatOrdinal($number) {
 
       <main class="home-main">
         <?php
-        // Determine view: records, announcements, transparency
         $view = isset($_GET['view']) ? $_GET['view'] : 'records';
-
+        $heroSpotlights = [
+          'records' => [
+            'hero_copy' => 'Review building assignments, finances, and grades in a single, refreshed timeline built for clarity.',
+            'spotlight_eyebrow' => 'Records overview',
+            'spotlight_title' => 'My Records',
+            'spotlight_copy' => 'Check building assignments, sanctions, financial status, and detailed grades in one cohesive space.'
+          ],
+          'announcements' => [
+            'hero_copy' => 'Catch up on campus headlines, filter by year or department, and keep every announcement at your fingertips.',
+            'spotlight_eyebrow' => 'Latest broadcasts',
+            'spotlight_title' => 'Announcements',
+            'spotlight_copy' => 'Browse targeted updates, stay informed on school activities, and never miss important campus news.'
+          ],
+          'grades' => [
+            'hero_copy' => 'Review your academic progress, semester summaries, and detailed subject grades in one comprehensive view.',
+            'spotlight_eyebrow' => 'Academic records',
+            'spotlight_title' => 'My Grades',
+            'spotlight_copy' => 'View all your subject grades organized by semester, track your academic performance, and monitor your progress throughout the year.'
+          ],
+          'transparency' => [
+            'hero_copy' => 'See where resources go, review project milestones, and keep the community informed with transparent reporting.',
+            'spotlight_eyebrow' => 'Project insights',
+            'spotlight_title' => 'Transparency',
+            'spotlight_copy' => 'Explore school project budgets, completion status, and milestones through an accessible transparency log.'
+          ],
+          'settings' => [
+            'hero_copy' => 'Personalize your profile, update your login details, and keep your account aligned with your current information.',
+            'spotlight_eyebrow' => 'Account controls',
+            'spotlight_title' => 'Settings',
+            'spotlight_copy' => 'Update your username, display name, password, and profile picture to keep your account up to date.'
+          ],
+        ];
+        $activeSpotlight = $heroSpotlights[$view] ?? $heroSpotlights['records'];
+        ?>
+        <section class="dashboard-hero">
+          <div class="hero-content">
+            <span class="hero-eyebrow">Student Dashboard</span>
+            <h1 class="hero-title">Hi, <?php echo htmlspecialchars($full_name); ?>!</h1>
+            <p class="hero-copy">
+              <?php echo htmlspecialchars($activeSpotlight['hero_copy']); ?>
+            </p>
+            <div class="hero-action-group">
+              <a class="hero-action <?php echo ($view === 'records') ? 'active' : ''; ?>" href="/TCC/public/home.php?view=records">
+                <i class="bi bi-journal-text"></i>
+                <span>Records</span>
+              </a>
+              <a class="hero-action <?php echo ($view === 'announcements') ? 'active' : ''; ?>" href="/TCC/public/home.php?view=announcements">
+                <i class="bi bi-megaphone-fill"></i>
+                <span>Announcements</span>
+              </a>
+              <a class="hero-action <?php echo ($view === 'grades') ? 'active' : ''; ?>" href="/TCC/public/home.php?view=grades">
+                <i class="bi bi-journal-bookmark-fill"></i>
+                <span>Grades</span>
+              </a>
+              <a class="hero-action <?php echo ($view === 'transparency') ? 'active' : ''; ?>" href="/TCC/public/home.php?view=transparency">
+                <i class="bi bi-graph-up-arrow"></i>
+                <span>Transparency</span>
+              </a>
+              <a class="hero-action <?php echo ($view === 'settings') ? 'active' : ''; ?>" href="/TCC/public/home.php?view=settings">
+                <i class="bi bi-gear-fill"></i>
+                <span>Settings</span>
+              </a>
+            </div>
+          </div>
+          <div class="hero-spotlight">
+            <div class="spotlight-card">
+              <span class="spotlight-eyebrow"><?php echo htmlspecialchars($activeSpotlight['spotlight_eyebrow']); ?></span>
+              <h2 class="spotlight-title"><?php echo htmlspecialchars($activeSpotlight['spotlight_title']); ?></h2>
+              <p class="spotlight-copy"><?php echo htmlspecialchars($activeSpotlight['spotlight_copy']); ?></p>
+            </div>
+            <div class="spotlight-card alt">
+              <span class="spotlight-eyebrow">Stay updated</span>
+              <h2 class="spotlight-title">Announcements Feed</h2>
+              <p class="spotlight-copy">Filter updates by year or department so you never miss the details that matter most.</p>
+              <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+              <a class="spotlight-link" href="/TCC/public/admin_dashboard.php">
+                <i class="bi bi-arrow-right-circle"></i>
+                Switch to Admin Dashboard
+              </a>
+              <?php endif; ?>
+            </div>
+          </div>
+        </section>
+        <?php
         if ($view === 'records') {
           ?>
           <div class="records-container">
@@ -523,49 +635,88 @@ function formatOrdinal($number) {
                     <?php endif; ?>
                   </div>
                 </div>
-                
-                <!-- Student Grades Display -->
-                <?php
+            </div>
+          </div>
+          <?php
+        } elseif ($view === 'grades') {
+          ?>
+          <div class="records-container">
+            <div class="records-header">
+              <h2 class="records-title">My Grades</h2>
+              <p class="records-subtitle">View your academic progress and subject grades</p>
+            </div>
+            <div class="records-main">
+              <?php
               try {
                 $currentUserId = $_SESSION['user_id'] ?? null;
                 $currentUsername = $_SESSION['username'] ?? '';
                 $currentFullName = $_SESSION['full_name'] ?? '';
                 
                 $studentGrades = [];
-                if ($currentUserId) {
-                  $gradesStmt = $conn->prepare("SELECT year, semester, subject, instructor, prelim_grade, midterm_grade, finals_grade FROM student_grades WHERE user_id = ? ORDER BY year, semester, subject");
-                  $gradesStmt->bind_param('i', $currentUserId);
-                  $gradesStmt->execute();
-                  $gradesResult = $gradesStmt->get_result();
-                  while ($gradeRow = $gradesResult->fetch_assoc()) {
-                    $studentGrades[] = $gradeRow;
-                  }
-                  $gradesStmt->close();
+                
+                // Build comprehensive query to match student grades
+                $conditions = [];
+                $types = '';
+                $params = [];
+                
+                // Priority 1: Match by user_id (most reliable)
+                if (!empty($currentUserId)) {
+                  $conditions[] = 'sg.user_id = ?';
+                  $types .= 'i';
+                  $params[] = $currentUserId;
                 }
                 
-                // Try by username if no grades found by user_id
-                if (empty($studentGrades) && !empty($currentUsername)) {
-                  $gradesStmtUser = $conn->prepare("SELECT year, semester, subject, instructor, prelim_grade, midterm_grade, finals_grade FROM student_grades WHERE username = ? ORDER BY year, semester, subject");
-                  $gradesStmtUser->bind_param('s', $currentUsername);
-                  $gradesStmtUser->execute();
-                  $gradesResultUser = $gradesStmtUser->get_result();
-                  while ($gradeRowUser = $gradesResultUser->fetch_assoc()) {
-                    $studentGrades[] = $gradeRowUser;
-                  }
-                  $gradesStmtUser->close();
+                // Priority 2: Match by exact username
+                if (!empty($currentUsername)) {
+                  $conditions[] = 'sg.username = ?';
+                  $types .= 's';
+                  $params[] = $currentUsername;
                 }
                 
-                // Also try by full name if still empty
-                if (empty($studentGrades) && !empty($currentFullName)) {
-                  $gradesStmt2 = $conn->prepare("SELECT year, semester, subject, instructor, prelim_grade, midterm_grade, finals_grade FROM student_grades WHERE username = ? OR username LIKE ? ORDER BY year, semester, subject");
-                  $likeName = '%' . $currentFullName . '%';
-                  $gradesStmt2->bind_param('ss', $currentFullName, $likeName);
-                  $gradesStmt2->execute();
-                  $gradesResult2 = $gradesStmt2->get_result();
-                  while ($gradeRow2 = $gradesResult2->fetch_assoc()) {
-                    $studentGrades[] = $gradeRow2;
+                // Priority 3: Match by exact full_name (if different from username)
+                if (!empty($currentFullName) && $currentFullName !== $currentUsername) {
+                  $conditions[] = 'sg.username = ?';
+                  $types .= 's';
+                  $params[] = $currentFullName;
+                }
+                
+                // Priority 4: Fuzzy match by username LIKE (for partial matches)
+                if (!empty($currentUsername)) {
+                  $conditions[] = 'sg.username LIKE ?';
+                  $types .= 's';
+                  $params[] = '%' . $currentUsername . '%';
+                }
+                
+                // Priority 5: Fuzzy match by full_name LIKE
+                if (!empty($currentFullName)) {
+                  $conditions[] = 'sg.username LIKE ?';
+                  $types .= 's';
+                  $params[] = '%' . $currentFullName . '%';
+                }
+                
+                // Execute query if we have conditions
+                if (!empty($conditions)) {
+                  $sql = "SELECT DISTINCT sg.year, sg.semester, sg.subject, sg.instructor, sg.prelim_grade, sg.midterm_grade, sg.finals_grade
+                          FROM student_grades sg
+                          WHERE (" . implode(' OR ', $conditions) . ")
+                          ORDER BY CAST(sg.year AS UNSIGNED), sg.semester, sg.subject";
+                  
+                  if ($stmtGrades = $conn->prepare($sql)) {
+                    if ($types !== '') {
+                      $bind = [];
+                      $bind[] = &$types;
+                      foreach ($params as $idx => $value) {
+                        $bind[] = &$params[$idx];
+                      }
+                      call_user_func_array([$stmtGrades, 'bind_param'], $bind);
+                    }
+                    $stmtGrades->execute();
+                    $resultGrades = $stmtGrades->get_result();
+                    while ($rowGrade = $resultGrades->fetch_assoc()) {
+                      $studentGrades[] = $rowGrade;
+                    }
+                    $stmtGrades->close();
                   }
-                  $gradesStmt2->close();
                 }
 
                 if (!empty($studentGrades)):
@@ -673,64 +824,88 @@ function formatOrdinal($number) {
                   }
                   $gradesByYear = $orderedYears + $gradesByYear;
               ?>
-              <div class="info-card mt-3">
-                <div class="card-header-modern">
-                  <i class="bi bi-journal-bookmark-fill"></i>
-                  <h3>My Grades</h3>
-                </div>
-                
-                <?php foreach ($gradesByYear as $yearData): ?>
-                  <?php
-                    $semesters = $yearData['semesters'];
-                    $preferredSemesters = ['First Semester', 'Second Semester'];
-                    $orderedSemesters = [];
-                    foreach ($preferredSemesters as $semName) {
-                      if (!empty($semesters[$semName])) {
-                        $orderedSemesters[$semName] = $semesters[$semName];
-                        unset($semesters[$semName]);
-                      }
+              <?php foreach ($gradesByYear as $yearData): ?>
+                <?php
+                  $semesters = $yearData['semesters'];
+                  $preferredSemesters = ['First Semester', 'Second Semester'];
+                  $orderedSemesters = [];
+                  foreach ($preferredSemesters as $semName) {
+                    if (!empty($semesters[$semName])) {
+                      $orderedSemesters[$semName] = $semesters[$semName];
+                      unset($semesters[$semName]);
                     }
-                    $orderedSemesters = $orderedSemesters + $semesters;
-                  ?>
-                  <div class="mb-4">
-                    <h4 class="grade-semester-title"><?php echo htmlspecialchars($yearData['label']); ?></h4>
-                    
-                    <?php foreach ($orderedSemesters as $semName => $gradesList): ?>
-                      <?php if (!empty($gradesList)): ?>
-                        <div class="mb-3">
-                          <h5 style="font-size: 1rem; font-weight: 600; color: var(--color-bark); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--color-ethereal);"><?php echo htmlspecialchars($semName); ?></h5>
-                          <div class="grade-cards-container">
-                            <?php foreach ($gradesList as $grade): ?>
-                              <div class="grade-card">
-                                <div class="grade-card-header">
+                  }
+                  $orderedSemesters = $orderedSemesters + $semesters;
+                ?>
+                <div class="info-card grades-year-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-calendar-year"></i>
+                    <h3><?php echo htmlspecialchars($yearData['label']); ?></h3>
+                  </div>
+                  
+                  <?php foreach ($orderedSemesters as $semName => $gradesList): ?>
+                    <?php if (!empty($gradesList)): ?>
+                      <div class="grades-semester-section">
+                        <div class="semester-header">
+                          <i class="bi bi-journal-bookmark"></i>
+                          <h4><?php echo htmlspecialchars($semName); ?></h4>
+                          <span class="semester-badge"><?php echo count($gradesList); ?> <?php echo count($gradesList) === 1 ? 'subject' : 'subjects'; ?></span>
+                        </div>
+                        <div class="grades-grid">
+                          <?php foreach ($gradesList as $grade): 
+                            // Calculate average if all grades are available
+                            $grades = array_filter([$grade['prelim_grade'], $grade['midterm_grade'], $grade['finals_grade']], function($g) { return $g !== null && $g !== ''; });
+                            $average = !empty($grades) ? round(array_sum($grades) / count($grades), 2) : null;
+                          ?>
+                            <div class="grade-card-modern">
+                              <div class="grade-card-header-modern">
+                                <div class="grade-subject-info">
                                   <h5 class="grade-subject-name"><?php echo htmlspecialchars($grade['subject']); ?></h5>
                                   <?php if (!empty($grade['instructor'])): ?>
-                                    <p class="grade-instructor"><i class="bi bi-person-badge"></i> <?php echo htmlspecialchars($grade['instructor']); ?></p>
+                                    <p class="grade-instructor">
+                                      <i class="bi bi-person-badge"></i>
+                                      <span><?php echo htmlspecialchars($grade['instructor']); ?></span>
+                                    </p>
                                   <?php endif; ?>
                                 </div>
-                                <div class="grade-details">
-                                  <div class="grade-item">
-                                    <span class="grade-label">Prelim</span>
-                                    <span class="grade-value"><?php echo $grade['prelim_grade'] !== null ? htmlspecialchars($grade['prelim_grade']) : '-'; ?></span>
+                                <?php if ($average !== null): ?>
+                                  <div class="grade-average-badge">
+                                    <i class="bi bi-graph-up"></i>
+                                    <span><?php echo number_format($average, 2); ?></span>
                                   </div>
-                                  <div class="grade-item">
-                                    <span class="grade-label">Midterm</span>
-                                    <span class="grade-value"><?php echo $grade['midterm_grade'] !== null ? htmlspecialchars($grade['midterm_grade']) : '-'; ?></span>
-                                  </div>
-                                  <div class="grade-item">
-                                    <span class="grade-label">Finals</span>
-                                    <span class="grade-value"><?php echo $grade['finals_grade'] !== null ? htmlspecialchars($grade['finals_grade']) : '-'; ?></span>
-                                  </div>
+                                <?php endif; ?>
+                              </div>
+                              <div class="grade-details-modern">
+                                <div class="grade-detail-item">
+                                  <span class="grade-period">
+                                    <i class="bi bi-circle-fill"></i>
+                                    Prelim
+                                  </span>
+                                  <span class="grade-number"><?php echo $grade['prelim_grade'] !== null ? number_format($grade['prelim_grade'], 2) : '—'; ?></span>
+                                </div>
+                                <div class="grade-detail-item">
+                                  <span class="grade-period">
+                                    <i class="bi bi-circle-fill"></i>
+                                    Midterm
+                                  </span>
+                                  <span class="grade-number"><?php echo $grade['midterm_grade'] !== null ? number_format($grade['midterm_grade'], 2) : '—'; ?></span>
+                                </div>
+                                <div class="grade-detail-item">
+                                  <span class="grade-period">
+                                    <i class="bi bi-circle-fill"></i>
+                                    Finals
+                                  </span>
+                                  <span class="grade-number"><?php echo $grade['finals_grade'] !== null ? number_format($grade['finals_grade'], 2) : '—'; ?></span>
                                 </div>
                               </div>
-                            <?php endforeach; ?>
-                          </div>
+                            </div>
+                          <?php endforeach; ?>
                         </div>
+                      </div>
                     <?php endif; ?>
-                    <?php endforeach; ?>
-                  </div>
-                <?php endforeach; ?>
-              </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endforeach; ?>
               <?php
                 endif;
               } catch (Throwable $ex) {
@@ -738,7 +913,7 @@ function formatOrdinal($number) {
               }
               if (empty($studentGrades)):
               ?>
-              <div class="info-card mt-3">
+              <div class="info-card">
                 <div class="card-header-modern">
                   <i class="bi bi-journal-x"></i>
                   <h3>My Grades</h3>
@@ -758,46 +933,70 @@ function formatOrdinal($number) {
               <h2 class="records-title">Announcements</h2>
               <p class="records-subtitle">Stay updated with the latest news and information</p>
             </div>
-            <div class="info-card">
-              <div class="card-header-modern">
-                <i class="bi bi-megaphone-fill"></i>
-                <h3>Latest Updates</h3>
-              </div>
-                <?php
-                // Prefer announcements from DB; fallback to JSON when table missing
-                $annList = [];
-                $filterYear = isset($_GET['year_filter']) ? trim($_GET['year_filter']) : '';
-                $filterDept = isset($_GET['dept_filter']) ? trim($_GET['dept_filter']) : '';
+            <div class="records-main">
+              <?php
+              // Prefer announcements from DB; fallback to JSON when table missing
+              $annList = [];
+              $filterYear = isset($_GET['year_filter']) ? trim($_GET['year_filter']) : '';
+              $filterDept = isset($_GET['dept_filter']) ? trim($_GET['dept_filter']) : '';
 
-                try {
-                  require_once __DIR__ . '/../BackEnd/database/db.php';
-                  $conn = Database::getInstance()->getConnection();
-                  $annQ = $conn->query("SELECT id, title, content, year, department, date FROM announcements ORDER BY date DESC");
-                } catch (Throwable $ex) {
-                  $annQ = false;
+              try {
+                require_once __DIR__ . '/../BackEnd/database/db.php';
+                $conn = Database::getInstance()->getConnection();
+                $annQ = $conn->query("SELECT id, title, content, year, department, date FROM announcements ORDER BY date DESC");
+              } catch (Throwable $ex) {
+                $annQ = false;
+              }
+              if ($annQ === false) {
+                // fallback to JSON
+                $annPath = __DIR__ . '/../database/announcements.json';
+                if (file_exists($annPath)) { $annList = json_decode(file_get_contents($annPath), true) ?: []; }
+              }
+              
+              // Collect announcements
+              $announcements = [];
+              if (isset($annQ) && $annQ !== false) {
+                while ($a = $annQ->fetch_assoc()) {
+                  if ($filterYear !== '' && isset($a['year']) && (string)$a['year'] !== $filterYear) continue;
+                  if ($filterDept !== '' && isset($a['department']) && $a['department'] !== $filterDept) continue;
+                  $announcements[] = $a;
                 }
-                if ($annQ === false) {
-                  // fallback to JSON
-                  $annPath = __DIR__ . '/../database/announcements.json';
-                  if (file_exists($annPath)) { $annList = json_decode(file_get_contents($annPath), true) ?: []; }
+              } else {
+                foreach (array_reverse($annList) as $a) {
+                  if ($filterYear !== '' && isset($a['year']) && (string)$a['year'] !== $filterYear) continue;
+                  if ($filterDept !== '' && isset($a['department']) && $a['department'] !== $filterDept) continue;
+                  $announcements[] = $a;
                 }
-                ?>
-                <form method="get" class="row g-3 mb-3">
+              }
+              ?>
+              
+              <div class="info-card">
+                <div class="card-header-modern">
+                  <i class="bi bi-funnel"></i>
+                  <h3>Filter Announcements</h3>
+                </div>
+                <form method="get" class="announcements-filter-form">
                   <input type="hidden" name="view" value="announcements" />
-                  <div class="col-md-3">
-                    <label for="year_filter" class="form-label">Year</label>
-                    <select id="year_filter" name="year_filter" class="form-select">
-                      <option value="">All</option>
+                  <div class="filter-group">
+                    <label for="year_filter" class="filter-label">
+                      <i class="bi bi-calendar-year"></i>
+                      Year Level
+                    </label>
+                    <select id="year_filter" name="year_filter" class="filter-select">
+                      <option value="">All Years</option>
                       <option value="1" <?php echo $filterYear==='1'?'selected':'';?>>1st Year</option>
                       <option value="2" <?php echo $filterYear==='2'?'selected':'';?>>2nd Year</option>
                       <option value="3" <?php echo $filterYear==='3'?'selected':'';?>>3rd Year</option>
                       <option value="4" <?php echo $filterYear==='4'?'selected':'';?>>4th Year</option>
                     </select>
                   </div>
-                  <div class="col-md-3">
-                    <label for="dept_filter" class="form-label">Department</label>
-                    <select id="dept_filter" name="dept_filter" class="form-select">
-                      <option value="">All</option>
+                  <div class="filter-group">
+                    <label for="dept_filter" class="filter-label">
+                      <i class="bi bi-building"></i>
+                      Department
+                    </label>
+                    <select id="dept_filter" name="dept_filter" class="filter-select">
+                      <option value="">All Departments</option>
                       <option value="IT" <?php echo $filterDept==='IT'?'selected':'';?>>IT</option>
                       <option value="HM" <?php echo $filterDept==='HM'?'selected':'';?>>HM</option>
                       <option value="BSEED" <?php echo $filterDept==='BSEED'?'selected':'';?>>BSEED</option>
@@ -805,36 +1004,141 @@ function formatOrdinal($number) {
                       <option value="TOURISM" <?php echo $filterDept==='TOURISM'?'selected':'';?>>TOURISM</option>
                     </select>
                   </div>
-                  <div class="col-md-3 align-self-end"><button class="btn btn-secondary">Filter</button></div>
+                  <button type="submit" class="filter-btn">
+                    <i class="bi bi-search"></i>
+                    Apply Filters
+                  </button>
                 </form>
-
-                <ul class="list-group">
-                  <?php
-                  if (isset($annQ) && $annQ !== false) {
-                    if ($annQ->num_rows == 0) {
-                      echo '<li class="list-group-item text-muted">No announcements yet.</li>';
-                    } else {
-                      while ($a = $annQ->fetch_assoc()) {
-                        if ($filterYear !== '' && isset($a['year']) && (string)$a['year'] !== $filterYear) continue;
-                        if ($filterDept !== '' && isset($a['department']) && $a['department'] !== $filterDept) continue;
-                        echo '<li class="list-group-item"><strong>' . htmlspecialchars($a['title']) . '</strong> <small class="text-muted">' . htmlspecialchars($a['date']) . '</small><div>' . nl2br(htmlspecialchars($a['content'])) . '</div></li>';
-                      }
-                    }
-                  } else {
-                    if (empty($annList)) {
-                      echo '<li class="list-group-item text-muted">No announcements yet.</li>';
-                    } else {
-                      foreach (array_reverse($annList) as $a) {
-                        if ($filterYear !== '' && isset($a['year']) && (string)$a['year'] !== $filterYear) continue;
-                        if ($filterDept !== '' && isset($a['department']) && $a['department'] !== $filterDept) continue;
-                        echo '<li class="list-group-item"><strong>' . htmlspecialchars($a['title']) . '</strong> <small class="text-muted">' . htmlspecialchars($a['date'] ?? '') . '</small><div>' . nl2br(htmlspecialchars($a['content'])) . '</div></li>';
-                      }
-                    }
-                  }
-                  ?>
-                </ul>
               </div>
+
+              <?php if (empty($announcements)): ?>
+                <div class="info-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-megaphone"></i>
+                    <h3>No Announcements</h3>
+                  </div>
+                  <p class="text-muted mb-0">No announcements match your current filters. Check back later for updates.</p>
+                </div>
+              <?php else: ?>
+                <div class="announcements-grid">
+                  <?php foreach ($announcements as $a): ?>
+                    <div class="announcement-card-modern">
+                      <div class="announcement-card-header">
+                        <div class="announcement-title-section">
+                          <h4 class="announcement-title"><?php echo htmlspecialchars($a['title']); ?></h4>
+                          <div class="announcement-meta">
+                            <span class="announcement-date">
+                              <i class="bi bi-calendar3"></i>
+                              <?php echo htmlspecialchars($a['date'] ?? 'Date not specified'); ?>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="announcement-content">
+                        <p><?php echo nl2br(htmlspecialchars($a['content'])); ?></p>
+                      </div>
+                      <div class="announcement-footer">
+                        <?php if (!empty($a['year'])): ?>
+                          <span class="announcement-badge">
+                            <i class="bi bi-mortarboard"></i>
+                            <?php 
+                              $yearNum = (int)$a['year'];
+                              echo $yearNum > 0 ? formatOrdinal($yearNum) . ' Year' : htmlspecialchars($a['year']);
+                            ?>
+                          </span>
+                        <?php endif; ?>
+                        <?php if (!empty($a['department'])): ?>
+                          <span class="announcement-badge">
+                            <i class="bi bi-building"></i>
+                            <?php echo htmlspecialchars($a['department']); ?>
+                          </span>
+                        <?php endif; ?>
+                      </div>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
             </div>
+          <?php
+        } elseif ($view === 'settings') {
+          ?>
+          <div class="records-container">
+            <div class="records-header">
+              <h2 class="records-title">
+                <i class="bi bi-gear-fill"></i> Settings
+              </h2>
+              <p class="records-subtitle">Manage your account preferences and profile information</p>
+            </div>
+
+            <?php if (isset($_GET['success'])): ?>
+              <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>Profile updated successfully.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            <?php elseif (isset($_GET['error'])): ?>
+              <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>An error occurred: <?php echo htmlspecialchars($_GET['error']); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            <?php endif; ?>
+
+            <div class="info-card">
+              <div class="card-header-modern">
+                <i class="bi bi-person-circle"></i>
+                <h3>Profile Information</h3>
+              </div>
+
+              <form id="settingsForm" action="/TCC/BackEnd/auth/update_profile.php" method="post" enctype="multipart/form-data">
+                <div class="settings-profile-section">
+                  <div class="profile-image-container">
+                    <div class="profile-image-wrapper">
+                      <img id="preview" src="<?php echo htmlspecialchars($image); ?>" class="profile-preview-large" alt="Profile" />
+                      <label for="profile_image" class="profile-upload-label">
+                        <i class="bi bi-camera-fill"></i>
+                        <span>Change Photo</span>
+                      </label>
+                      <input type="file" name="profile_image" id="profile_image" accept="image/*" class="profile-upload-input" />
+                    </div>
+                  </div>
+
+                  <div class="settings-form-fields">
+                    <div class="settings-field">
+                      <label for="username" class="settings-label">
+                        <i class="bi bi-person"></i> Username
+                      </label>
+                      <input id="username" name="username" class="settings-input" value="<?php echo htmlspecialchars($_SESSION['username']); ?>" required />
+                      <div id="usernameFeedback" class="settings-feedback text-danger" style="display:none"></div>
+                    </div>
+
+                    <div class="settings-field">
+                      <label for="full_name" class="settings-label">
+                        <i class="bi bi-card-text"></i> Full Name
+                      </label>
+                      <input id="full_name" name="full_name" class="settings-input" value="<?php echo htmlspecialchars($full_name); ?>" required />
+                      <div id="fullnameFeedback" class="settings-feedback text-danger" style="display:none"></div>
+                    </div>
+
+                    <div class="settings-field">
+                      <label for="password" class="settings-label">
+                        <i class="bi bi-lock"></i> New Password
+                      </label>
+                      <input id="password" name="password" type="password" class="settings-input" placeholder="Leave blank to keep current password" />
+                      <small class="settings-hint">Leave blank if you don't want to change your password</small>
+                    </div>
+
+                    <div class="settings-actions">
+                      <button class="btn btn-primary settings-save-btn" type="submit">
+                        <i class="bi bi-check-lg me-2"></i>Save Changes
+                      </button>
+                      <a href="/TCC/public/home.php" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-2"></i>Cancel
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
           <?php
         } elseif ($view === 'transparency') {
           ?>
@@ -843,42 +1147,56 @@ function formatOrdinal($number) {
               <h2 class="records-title">Transparency / Projects</h2>
               <p class="records-subtitle">View project budgets and completion status</p>
             </div>
-            <div class="info-card">
-              <div class="card-header-modern">
-                <i class="bi bi-graph-up"></i>
-                <h3>Project Information</h3>
-              </div>
-                <div class="table-responsive">
-                  <?php
-                  $pPath = __DIR__ . '/../database/projects.json';
-                  $projects = [];
-                  if (file_exists($pPath)) { $projects = json_decode(file_get_contents($pPath), true) ?: []; }
-                  ?>
-                  <table class="table table-striped">
-                    <thead>
-                      <tr>
-                        <th>Project Name</th>
-                        <th>Budget</th>
-                        <th>Started</th>
-                        <th>Completed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <?php if (empty($projects)): ?>
-                        <tr><td colspan="4" class="text-muted">No projects found.</td></tr>
-                      <?php else: ?>
-                        <?php foreach ($projects as $proj): ?>
-                          <tr>
-                            <td><?php echo htmlspecialchars($proj['name']); ?></td>
-                            <td><?php echo htmlspecialchars($proj['budget']); ?></td>
-                            <td><?php echo htmlspecialchars($proj['started']); ?></td>
-                            <td><?php echo ($proj['completed']==='yes')? 'Yes':'No'; ?></td>
-                          </tr>
-                        <?php endforeach; ?>
-                      <?php endif; ?>
-                    </tbody>
-                  </table>
+            <div class="records-main">
+              <?php
+              $pPath = __DIR__ . '/../database/projects.json';
+              $projects = [];
+              if (file_exists($pPath)) { $projects = json_decode(file_get_contents($pPath), true) ?: []; }
+              ?>
+              
+              <?php if (empty($projects)): ?>
+                <div class="info-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-folder-x"></i>
+                    <h3>No Projects</h3>
+                  </div>
+                  <p class="text-muted mb-0">No project information available at this time.</p>
                 </div>
+              <?php else: ?>
+                <div class="projects-grid">
+                  <?php foreach ($projects as $proj): 
+                    $isCompleted = isset($proj['completed']) && strtolower($proj['completed']) === 'yes';
+                  ?>
+                    <div class="project-card-modern">
+                      <div class="project-card-header">
+                        <div class="project-title-section">
+                          <h4 class="project-title"><?php echo htmlspecialchars($proj['name']); ?></h4>
+                          <div class="project-status-badge <?php echo $isCompleted ? 'status-completed' : 'status-ongoing'; ?>">
+                            <i class="bi <?php echo $isCompleted ? 'bi-check-circle-fill' : 'bi-clock-history'; ?>"></i>
+                            <span><?php echo $isCompleted ? 'Completed' : 'Ongoing'; ?></span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="project-details">
+                        <div class="project-detail-item">
+                          <div class="project-detail-label">
+                            <i class="bi bi-cash-coin"></i>
+                            <span>Budget</span>
+                          </div>
+                          <div class="project-detail-value"><?php echo htmlspecialchars($proj['budget']); ?></div>
+                        </div>
+                        <div class="project-detail-item">
+                          <div class="project-detail-label">
+                            <i class="bi bi-calendar-event"></i>
+                            <span>Started</span>
+                          </div>
+                          <div class="project-detail-value"><?php echo htmlspecialchars($proj['started']); ?></div>
+                        </div>
+                      </div>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
             </div>
           <?php
         }
@@ -895,5 +1213,64 @@ function formatOrdinal($number) {
         })
       })
     </script>
+    <?php if ($view === 'settings'): ?>
+    <script>
+      document.getElementById('profile_image').addEventListener('change', function (e) {
+        const f = e.target.files[0];
+        if (!f) return;
+        const url = URL.createObjectURL(f);
+        document.getElementById('preview').src = url;
+      });
+
+      function debounce(fn, wait) {
+        let t;
+        return function (...args) {
+          clearTimeout(t);
+          t = setTimeout(() => fn.apply(this, args), wait);
+        };
+      }
+
+      const usernameInput = document.getElementById('username');
+      const fullInput = document.getElementById('full_name');
+
+      if (usernameInput) {
+        usernameInput.addEventListener('input', debounce(function () {
+          const val = this.value.trim();
+          if (!val) return;
+          fetch('/TCC/BackEnd/auth/check_availability.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'type=username&value=' + encodeURIComponent(val)
+          })
+          .then(r => r.json())
+          .then(j => {
+            const fb = document.getElementById('usernameFeedback');
+            if (!j.success) { fb.style.display = 'block'; fb.textContent = 'Error checking availability'; }
+            else if (!j.available) { fb.style.display = 'block'; fb.textContent = 'Username already taken'; }
+            else { fb.style.display = 'none'; }
+          });
+        }, 400));
+      }
+
+      if (fullInput) {
+        fullInput.addEventListener('input', debounce(function () {
+          const val = this.value.trim();
+          if (!val) return;
+          fetch('/TCC/BackEnd/auth/check_availability.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'type=full_name&value=' + encodeURIComponent(val)
+          })
+          .then(r => r.json())
+          .then(j => {
+            const fb = document.getElementById('fullnameFeedback');
+            if (!j.success) { fb.style.display = 'block'; fb.textContent = 'Error checking availability'; }
+            else if (!j.available) { fb.style.display = 'block'; fb.textContent = 'Full name already used'; }
+            else { fb.style.display = 'none'; }
+          });
+        }, 400));
+      }
+    </script>
+    <?php endif; ?>
   </body>
 </html>

@@ -92,6 +92,16 @@ class Database {
             error_log("Tables do not exist. Creating all tables automatically...");
             $this->createAllTables();
         } else {
+            // Ensure school_id column exists on users table
+            $schoolIdColumn = $this->conn->query("SHOW COLUMNS FROM users LIKE 'school_id'");
+            if ($schoolIdColumn && $schoolIdColumn->num_rows === 0) {
+                @$this->conn->query("ALTER TABLE users ADD COLUMN school_id VARCHAR(20) UNIQUE AFTER full_name");
+            }
+            // Ensure created_at column exists on users table
+            $createdAtColumn = $this->conn->query("SHOW COLUMNS FROM users LIKE 'created_at'");
+            if ($createdAtColumn && $createdAtColumn->num_rows === 0) {
+                @$this->conn->query("ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+            }
             // Check if student_grades table exists, create it if missing
             $gradesCheck = $this->conn->query("SHOW TABLES LIKE 'student_grades'");
             if ($gradesCheck->num_rows == 0) {
@@ -136,6 +146,7 @@ class Database {
                 username VARCHAR(50) NOT NULL UNIQUE,
                 password VARCHAR(255) NOT NULL,
                 full_name VARCHAR(100) NOT NULL,
+                school_id VARCHAR(20) UNIQUE,
                 role ENUM('admin', 'teacher', 'student') NOT NULL,
                 image_path VARCHAR(255) DEFAULT '/TCC/public/images/sample.jpg',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -168,6 +179,15 @@ class Database {
                 rooms_per_floor INT DEFAULT 4
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             
+            // Sections table
+            "CREATE TABLE IF NOT EXISTS sections (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                year VARCHAR(10) NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_year_name (year, name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            
             // Section assignments table
             "CREATE TABLE IF NOT EXISTS section_assignments (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -192,6 +212,19 @@ class Database {
                 owing_amount VARCHAR(64) DEFAULT NULL,
                 INDEX idx_user_id (user_id),
                 INDEX idx_username (username)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            
+            // Teacher assignments table
+            "CREATE TABLE IF NOT EXISTS teacher_assignments (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT DEFAULT NULL,
+                username VARCHAR(200) NOT NULL,
+                year VARCHAR(10) NOT NULL,
+                subject VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_user_id (user_id),
+                INDEX idx_username (username),
+                INDEX idx_year (year)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             
             // Audit log table
@@ -223,6 +256,25 @@ class Database {
                 INDEX idx_username (username),
                 INDEX idx_year_semester (year, semester),
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            
+            // Schedules table
+            "CREATE TABLE IF NOT EXISTS schedules (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                year VARCHAR(10) NOT NULL,
+                subject VARCHAR(255) NOT NULL,
+                day VARCHAR(20) NOT NULL,
+                time_start TIME NOT NULL,
+                time_end TIME NOT NULL,
+                room VARCHAR(100) DEFAULT NULL,
+                instructor VARCHAR(255) DEFAULT NULL,
+                section VARCHAR(100) DEFAULT NULL,
+                building VARCHAR(10) DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_year (year),
+                INDEX idx_subject (subject),
+                INDEX idx_day (day)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         ];
         
@@ -250,7 +302,7 @@ class Database {
         $checkAdmin = $this->conn->query("SELECT id FROM users WHERE username = 'admin'");
         if ($checkAdmin->num_rows == 0) {
             $adminPassword = password_hash('admin123', PASSWORD_DEFAULT);
-            $stmt = $this->conn->prepare("INSERT INTO users (username, password, full_name, role) VALUES (?, ?, 'Administrator', 'admin')");
+            $stmt = $this->conn->prepare("INSERT INTO users (username, password, full_name, role, school_id) VALUES (?, ?, 'Administrator', 'admin', 'ADMIN - 0000')");
             $adminUsername = 'admin';
             $stmt->bind_param('ss', $adminUsername, $adminPassword);
             if ($stmt->execute()) {

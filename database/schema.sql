@@ -11,6 +11,7 @@ CREATE TABLE users (
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
+    school_id VARCHAR(20) UNIQUE,
     role ENUM('admin', 'teacher', 'student') NOT NULL,
     image_path VARCHAR(255) DEFAULT '/TCC/public/images/sample.jpg',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -82,6 +83,6 @@ CREATE TABLE audit_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Insert default admin user (password: admin123)
-INSERT INTO users (username, password, full_name, role) VALUES 
-('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Administrator', 'admin');
+INSERT INTO users (username, password, full_name, role, school_id) VALUES 
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Administrator', 'admin', 'ADMIN - 0000');
 
