@@ -5,6 +5,6 @@ if (!isset($_SESSION['username']) || ($_SESSION['role'] ?? '') !== 'admin') {
   exit();
 }
 
-header('Location: /TCC/public/admin_dashboard.php?section=user_management');
+header('Location: /TCC/public/admin_dashboard.php?section=manage_students');
 exit();
 

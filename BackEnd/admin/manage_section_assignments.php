@@ -1,19 +1,28 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') { header('HTTP/1.1 403 Forbidden'); exit('Forbidden'); }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: /TCC/public/admin_dashboard.php?section=buildings'); exit(); }
+require_once __DIR__ . '/../helpers/admin_helpers.php';
+require_admin_post('/TCC/public/admin_dashboard.php?section=buildings');
 
 require_once __DIR__ . '/../database/db.php';
 $conn = Database::getInstance()->getConnection();
 
-// Ensure sections table exists
-$conn->query("CREATE TABLE IF NOT EXISTS sections (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  year VARCHAR(10) NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uniq_year_name (year, name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+ensure_tables($conn, [
+  'sections' => "CREATE TABLE IF NOT EXISTS sections (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    year VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_year_name (year, name)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+  'section_assignments' => "CREATE TABLE IF NOT EXISTS section_assignments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    year VARCHAR(10) NOT NULL,
+    section VARCHAR(100) NOT NULL,
+    building VARCHAR(10) NOT NULL,
+    floor INT DEFAULT 1,
+    room VARCHAR(50) NOT NULL,
+    UNIQUE KEY uniq_year_section (year, section)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+]);
 
 $action = $_POST['action'] ?? 'create';
 $year = trim($_POST['year'] ?? '');

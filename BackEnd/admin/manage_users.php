@@ -1,30 +1,37 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') { header('HTTP/1.1 403 Forbidden'); exit('Forbidden'); }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: /TCC/public/admin_dashboard.php?section=user_management'); exit(); }
+require_once __DIR__ . '/../helpers/admin_helpers.php';
+require_admin_post('/TCC/public/admin_dashboard.php?section=manage_students');
 
 require_once __DIR__ . '/../database/db.php';
 $conn = Database::getInstance()->getConnection();
 
-// Ensure teacher_assignments table exists
-$conn->query("CREATE TABLE IF NOT EXISTS teacher_assignments (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT DEFAULT NULL,
-  username VARCHAR(200) NOT NULL,
-  year VARCHAR(10) NOT NULL,
-  subject VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_user_id (user_id),
-  INDEX idx_username (username),
-  INDEX idx_year (year)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+ensure_tables($conn, [
+  'teacher_assignments' => "CREATE TABLE IF NOT EXISTS teacher_assignments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT DEFAULT NULL,
+    username VARCHAR(200) NOT NULL,
+    year VARCHAR(10) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_username (username),
+    INDEX idx_year (year)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+  'sections' => "CREATE TABLE IF NOT EXISTS sections (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    year VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_year_name (year, name)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+]);
 
 $action = $_POST['action'] ?? 'assign';
 
 if ($action === 'delete') {
 	// Delete user assignment
 	$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-	if ($id <= 0) { header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=invalid_id'); exit(); }
+	if ($id <= 0) { header('Location: /TCC/public/admin_dashboard.php?section=manage_students&error=invalid_id'); exit(); }
 	
 	// Get assignment info for audit log
 	$sel = $conn->prepare("SELECT username, year, section FROM user_assignments WHERE id = ? LIMIT 1");
@@ -41,17 +48,10 @@ if ($action === 'delete') {
 	$stmt->close();
 	
 	// Audit log
-	$a = $_SESSION['username'] ?? null;
-	$act = 'delete';
-	$t = 'user_assignments';
-	$id_s = (string)$id;
 	$details = "deleted user_assignment for " . ($assignmentInfo['username'] ?? 'unknown') . " (year: " . ($assignmentInfo['year'] ?? '') . ", section: " . ($assignmentInfo['section'] ?? '') . ")";
-	$l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-	$l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-	$l->execute();
-	$l->close();
+	log_audit($conn, 'delete', 'user_assignments', $id, $details);
 	
-	header('Location: /TCC/public/admin_dashboard.php?section=user_management&deleted=1'); exit();
+	header('Location: /TCC/public/admin_dashboard.php?section=manage_students&deleted=1'); exit();
 	
 } else if ($action === 'update') {
 		// update existing user's payment/sanctions/department by full_name
@@ -62,7 +62,7 @@ if ($action === 'delete') {
 			$p = $conn->prepare("SELECT id, full_name FROM users WHERE id = ? LIMIT 1");
 			if ($p) { $p->bind_param('i', $existingUserId); $p->execute(); $gr = $p->get_result(); if ($g = $gr->fetch_assoc()) { $full_name = $g['full_name'] ?? $full_name; } $p->close(); }
 		}
-		if ($full_name === '') { header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=missing'); exit(); }
+		if ($full_name === '') { header('Location: /TCC/public/admin_dashboard.php?section=manage_students&error=missing'); exit(); }
 
 		$payment = trim($_POST['payment'] ?? 'paid'); // 'paid' or 'owing'
 		$sanctions = trim($_POST['sanctions'] ?? '');
@@ -72,7 +72,7 @@ if ($action === 'delete') {
 		// validate owing amount when payment is owing
 		if ($payment === 'owing') {
 			if ($owing_amount === '' || !is_numeric($owing_amount) || floatval($owing_amount) <= 0) {
-				header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=invalid_owing'); exit();
+				header('Location: /TCC/public/admin_dashboard.php?section=manage_students&error=invalid_owing'); exit();
 			}
 		} else {
 			// clear owing when not owing
@@ -123,17 +123,10 @@ if ($action === 'delete') {
 		$stmt->execute();
 	}
 
-		// audit
-		$a = $_SESSION['username'] ?? null;
-		$act = 'update'; 
-		$t = 'user_assignments'; 
-		$id_s = $existing_id ? (string)$existing_id : ($conn->insert_id ? (string)$conn->insert_id : $full_name); 
+		$id_s = $existing_id ? (string)$existing_id : ($conn->insert_id ? (string)$conn->insert_id : $full_name);
 		$details = "updated user_assignment for $full_name: payment=$payment, sanctions=" . (empty($sanctions) ? 'none' : $sanctions) . ", owing=" . ($owing_amount ?: '0');
-		$l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-		$l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-		$l->execute();
-
-		header('Location: /TCC/public/admin_dashboard.php?section=user_management&updated=1'); exit();
+		log_audit($conn, 'update', 'user_assignments', $id_s, $details);
+		header('Location: /TCC/public/admin_dashboard.php?section=manage_students&updated=1'); exit();
 
 } else {
 		// assign new user to year/section (and optional department)
@@ -147,16 +140,7 @@ if ($action === 'delete') {
 		$section = trim($_POST['section'] ?? '');
 		$department = trim($_POST['department'] ?? '');
 
-		if ($full_name === '' || $year === '' || $section === '') { header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=missing'); exit(); }
-
-		// Ensure sections table exists
-		$conn->query("CREATE TABLE IF NOT EXISTS sections (
-		  id INT AUTO_INCREMENT PRIMARY KEY,
-		  year VARCHAR(10) NOT NULL,
-		  name VARCHAR(100) NOT NULL,
-		  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		  UNIQUE KEY uniq_year_name (year, name)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+		if ($full_name === '' || $year === '' || $section === '') { header('Location: /TCC/public/admin_dashboard.php?section=manage_students&error=missing'); exit(); }
 
 		// Validate section exists in sections table
 		$sectionCheck = $conn->prepare("SELECT id FROM sections WHERE year = ? AND name = ? LIMIT 1");
@@ -165,7 +149,7 @@ if ($action === 'delete') {
 		$sectionResult = $sectionCheck->get_result();
 		if ($sectionResult->num_rows === 0) {
 			$sectionCheck->close();
-			header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=section_not_found'); 
+			header('Location: /TCC/public/admin_dashboard.php?section=manage_students&error=section_not_found'); 
 			exit();
 		}
 		$sectionCheck->close();
@@ -178,7 +162,7 @@ if ($action === 'delete') {
 			$userResult = $userCheck->get_result();
 			if ($userResult->num_rows === 0) {
 				$userCheck->close();
-				header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=user_not_found'); 
+				header('Location: /TCC/public/admin_dashboard.php?section=manage_students&error=user_not_found'); 
 				exit();
 			}
 			$userCheck->close();
@@ -209,13 +193,9 @@ if ($action === 'delete') {
 			if ($up) { $up->bind_param('is', $user_id, $full_name); $up->execute(); }
 		}
 
-		// audit
-		$a = $_SESSION['username'] ?? null; $act = 'create'; $t = 'user_assignments'; $id_s = (string)$conn->insert_id; $details = "assigned $full_name to $year/$section";
-		$l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-		$l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-		$l->execute();
-
-		header('Location: /TCC/public/admin_dashboard.php?section=user_management&success=1'); exit();
+		$details = "assigned $full_name to $year/$section";
+		log_audit($conn, 'create', 'user_assignments', $conn->insert_id, $details);
+		header('Location: /TCC/public/admin_dashboard.php?section=manage_students&success=1'); exit();
 }
 
 // Teacher assignment actions
@@ -231,7 +211,7 @@ if ($action === 'assign_teacher') {
 	$subject = trim($_POST['subject'] ?? '');
 
 	if ($full_name === '' || $year === '' || $subject === '') { 
-		header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=missing'); 
+		header('Location: /TCC/public/admin_dashboard.php?section=manage_teachers&error=missing'); 
 		exit(); 
 	}
 
@@ -243,7 +223,7 @@ if ($action === 'assign_teacher') {
 		$userResult = $userCheck->get_result();
 		if ($userResult->num_rows === 0) {
 			$userCheck->close();
-			header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=user_not_found'); 
+			header('Location: /TCC/public/admin_dashboard.php?section=manage_teachers&error=user_not_found'); 
 			exit();
 		}
 		$userCheck->close();
@@ -268,24 +248,16 @@ if ($action === 'assign_teacher') {
 	$stmt->execute();
 	$stmt->close();
 
-	// Audit
-	$a = $_SESSION['username'] ?? null; 
-	$act = 'create'; 
-	$t = 'teacher_assignments'; 
-	$id_s = (string)$conn->insert_id; 
 	$details = "assigned teacher $full_name to $year/$subject";
-	$l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-	$l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-	$l->execute();
-	$l->close();
+	log_audit($conn, 'create', 'teacher_assignments', $conn->insert_id, $details);
 
-	header('Location: /TCC/public/admin_dashboard.php?section=user_management&success=teacher_assigned'); exit();
+	header('Location: /TCC/public/admin_dashboard.php?section=manage_teachers&success=teacher_assigned'); exit();
 	
 } else if ($action === 'delete_teacher') {
 	// Delete teacher assignment
 	$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
 	if ($id <= 0) { 
-		header('Location: /TCC/public/admin_dashboard.php?section=user_management&error=invalid_id'); 
+		header('Location: /TCC/public/admin_dashboard.php?section=manage_teachers&error=invalid_id'); 
 		exit(); 
 	}
 	
@@ -304,15 +276,8 @@ if ($action === 'assign_teacher') {
 	$stmt->close();
 	
 	// Audit log
-	$a = $_SESSION['username'] ?? null;
-	$act = 'delete';
-	$t = 'teacher_assignments';
-	$id_s = (string)$id;
 	$details = "deleted teacher_assignment for " . ($assignmentInfo['username'] ?? 'unknown') . " (year: " . ($assignmentInfo['year'] ?? '') . ", subject: " . ($assignmentInfo['subject'] ?? '') . ")";
-	$l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-	$l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-	$l->execute();
-	$l->close();
+	log_audit($conn, 'delete', 'teacher_assignments', $id, $details);
 	
-	header('Location: /TCC/public/admin_dashboard.php?section=user_management&success=teacher_deleted'); exit();
+	header('Location: /TCC/public/admin_dashboard.php?section=manage_teachers&success=teacher_deleted'); exit();
 }

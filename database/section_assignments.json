@@ -3,17 +3,17 @@
         "id": 1,
         "year": "3",
         "section": "Altruism",
-        "building": "C",
-        "floor": 3,
-        "room": "301"
+        "building": "D",
+        "floor": 2,
+        "room": "303"
     },
     "3|Devotion": {
-        "id": 9,
+        "id": 4,
         "year": "3",
         "section": "Devotion",
-        "building": "C",
-        "floor": 1,
-        "room": "303"
+        "building": "D",
+        "floor": 3,
+        "room": "301"
     },
     "1|Benevolence": {
         "id": 10,
@@ -21,6 +21,22 @@
         "section": "Benevolence",
         "building": "A",
         "floor": 1,
+        "room": "301"
+    },
+    "3|Benevolence": {
+        "id": 2,
+        "year": "3",
+        "section": "Benevolence",
+        "building": "D",
+        "floor": 3,
+        "room": "301"
+    },
+    "3|Charity": {
+        "id": 3,
+        "year": "3",
+        "section": "Charity",
+        "building": "C",
+        "floor": 2,
         "room": "301"
     }
 }

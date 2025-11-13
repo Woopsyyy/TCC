@@ -55,6 +55,15 @@ CREATE TABLE section_assignments (
     UNIQUE KEY uniq_year_section (year, section)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Sections table
+CREATE TABLE sections (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    year VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_year_name (year, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- User assignments table
 CREATE TABLE user_assignments (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -69,6 +78,56 @@ CREATE TABLE user_assignments (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_user_id (user_id),
     INDEX idx_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Teacher assignments table
+CREATE TABLE teacher_assignments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT DEFAULT NULL,
+    username VARCHAR(200) NOT NULL,
+    year VARCHAR(10) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_username (username),
+    INDEX idx_year (year),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Schedules table
+CREATE TABLE schedules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    year VARCHAR(10) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    day VARCHAR(20) NOT NULL,
+    time_start TIME NOT NULL,
+    time_end TIME NOT NULL,
+    room VARCHAR(100) DEFAULT NULL,
+    instructor VARCHAR(255) DEFAULT NULL,
+    section VARCHAR(100) DEFAULT NULL,
+    building VARCHAR(10) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_year (year),
+    INDEX idx_subject (subject),
+    INDEX idx_day (day)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Student grades table
+CREATE TABLE student_grades (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT DEFAULT NULL,
+    username VARCHAR(255) NOT NULL,
+    year VARCHAR(20) NOT NULL,
+    semester VARCHAR(20) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    instructor VARCHAR(255) DEFAULT NULL,
+    prelim_grade DECIMAL(5,2) DEFAULT NULL,
+    midterm_grade DECIMAL(5,2) DEFAULT NULL,
+    finals_grade DECIMAL(5,2) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Audit log table

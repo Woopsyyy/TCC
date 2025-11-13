@@ -1,25 +1,19 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') { 
-  header('HTTP/1.1 403 Forbidden'); 
-  exit('Forbidden'); 
-}
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { 
-  header('Location: /TCC/public/admin_dashboard.php?section=sections'); 
-  exit(); 
-}
+require_once __DIR__ . '/../helpers/admin_helpers.php';
+require_admin_post('/TCC/public/admin_dashboard.php?section=sections');
 
 require_once __DIR__ . '/../database/db.php';
 $conn = Database::getInstance()->getConnection();
 
-// Ensure sections table exists
-$conn->query("CREATE TABLE IF NOT EXISTS sections (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  year VARCHAR(10) NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uniq_year_name (year, name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+ensure_tables($conn, [
+  'sections' => "CREATE TABLE IF NOT EXISTS sections (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    year VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_year_name (year, name)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+]);
 
 $action = $_POST['action'] ?? 'create';
 
@@ -45,16 +39,8 @@ if ($action === 'delete') {
   $stmt->execute();
   $stmt->close();
   
-  // Audit log
-  $a = $_SESSION['username'] ?? null;
-  $act = 'delete';
-  $t = 'sections';
-  $id_s = (string)$id;
   $details = "deleted section: " . ($sectionInfo['name'] ?? 'unknown') . " (Year: " . ($sectionInfo['year'] ?? '') . ")";
-  $l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-  $l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-  $l->execute();
-  $l->close();
+  log_audit($conn, 'delete', 'sections', $id, $details);
   
   header('Location: /TCC/public/admin_dashboard.php?section=sections&success=deleted'); 
   exit();
@@ -88,16 +74,8 @@ if ($action === 'delete') {
   $stmt->execute();
   $stmt->close();
   
-  // Audit log
-  $a = $_SESSION['username'] ?? null;
-  $act = 'update';
-  $t = 'sections';
-  $id_s = (string)$id;
   $details = "updated section: " . $name . " (Year: " . $year . ")";
-  $l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-  $l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-  $l->execute();
-  $l->close();
+  log_audit($conn, 'update', 'sections', $id, $details);
   
   header('Location: /TCC/public/admin_dashboard.php?section=sections&success=updated'); 
   exit();
@@ -131,16 +109,8 @@ if ($action === 'delete') {
   $newId = $conn->insert_id;
   $stmt->close();
   
-  // Audit log
-  $a = $_SESSION['username'] ?? null;
-  $act = 'create';
-  $t = 'sections';
-  $id_s = (string)$newId;
   $details = "created section: " . $name . " (Year: " . $year . ")";
-  $l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-  $l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-  $l->execute();
-  $l->close();
+  log_audit($conn, 'create', 'sections', $newId, $details);
   
   header('Location: /TCC/public/admin_dashboard.php?section=sections&success=created'); 
   exit();

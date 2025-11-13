@@ -56,6 +56,7 @@ function formatOrdinal($number) {
     <link rel="stylesheet" href="css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="css/home.css" />
+    <link rel="stylesheet" href="css/home_sidebar.css" />
     <title>Home</title>
   </head>
   <body>
@@ -194,16 +195,16 @@ function formatOrdinal($number) {
               <h2 class="spotlight-title"><?php echo htmlspecialchars($activeSpotlight['spotlight_title']); ?></h2>
               <p class="spotlight-copy"><?php echo htmlspecialchars($activeSpotlight['spotlight_copy']); ?></p>
             </div>
-            <div class="spotlight-card alt">
-              <span class="spotlight-eyebrow">Stay updated</span>
-              <h2 class="spotlight-title">Announcements Feed</h2>
-              <p class="spotlight-copy">Filter updates by year or department so you never miss the details that matter most.</p>
-              <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
-              <a class="spotlight-link" href="/TCC/public/admin_dashboard.php">
-                <i class="bi bi-arrow-right-circle"></i>
-                Switch to Admin Dashboard
-              </a>
-              <?php endif; ?>
+            <div class="spotlight-card alt clock-card" id="homeClockCard">
+              <p class="clock-time">
+                <span id="homeClockTime">--:--:--</span>
+                <span class="clock-time-sub" id="homeClockSub">--</span>
+              </p>
+              <p class="clock-day" id="homeClockDay">Loading...</p>
+              <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 16 16" class="clock-moon" fill="currentColor" stroke="currentColor">
+                <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"></path>
+                <path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"></path>
+              </svg>
             </div>
           </div>
         </section>
@@ -1205,13 +1206,68 @@ function formatOrdinal($number) {
     </div>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script>
-      // enable Bootstrap tooltips
-      document.addEventListener('DOMContentLoaded', function () {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        tooltipTriggerList.forEach(function (el) {
-          new bootstrap.Tooltip(el)
-        })
-      })
+      (function () {
+        function ordinal(n) {
+          var suffixes = ['th', 'st', 'nd', 'rd'];
+          var v = n % 100;
+          return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+        }
+        function updateClock(prefix) {
+          var timeEl = document.getElementById(prefix + 'ClockTime');
+          var subEl = document.getElementById(prefix + 'ClockSub');
+          var dayEl = document.getElementById(prefix + 'ClockDay');
+          if (!timeEl || !subEl || !dayEl) {
+            return;
+          }
+          var now = new Date();
+          var hours24 = now.getHours();
+          var minutes = now.getMinutes();
+          var seconds = now.getSeconds();
+          var ampm = hours24 >= 12 ? 'PM' : 'AM';
+          var displayHour = hours24 % 12;
+          if (displayHour === 0) {
+            displayHour = 12;
+          }
+          var hourText = displayHour < 10 ? '0' + displayHour : String(displayHour);
+          var minuteText = minutes < 10 ? '0' + minutes : String(minutes);
+          var secondText = seconds < 10 ? '0' + seconds : String(seconds);
+          timeEl.textContent = hourText + ':' + minuteText + ':' + secondText;
+          subEl.textContent = ampm;
+          var weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
+          var month = now.toLocaleDateString(undefined, { month: 'long' });
+          var day = ordinal(now.getDate());
+          dayEl.textContent = weekday + ', ' + month + ' ' + day;
+        }
+        function startClock() {
+          updateClock('home');
+          if (window.__homeClockTimer) {
+            clearInterval(window.__homeClockTimer);
+          }
+          window.__homeClockTimer = setInterval(function () {
+            updateClock('home');
+          }, 1000);
+        }
+        startClock();
+        document.addEventListener('DOMContentLoaded', function () {
+          try {
+            var tooltipTriggerList = Array.prototype.slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function (el) {
+              if (window.bootstrap && typeof window.bootstrap.Tooltip === 'function') {
+                new window.bootstrap.Tooltip(el);
+              }
+            });
+          } catch (err) {
+            console.warn('Tooltip init skipped:', err);
+          }
+          startClock();
+        });
+        document.addEventListener('visibilitychange', function () {
+          if (!document.hidden) {
+            startClock();
+          }
+        });
+        window.startHomeClock = startClock;
+      })();
     </script>
     <?php if ($view === 'settings'): ?>
     <script>

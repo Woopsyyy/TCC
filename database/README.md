@@ -26,8 +26,12 @@ The database includes the following tables:
 - `announcements` - System announcements
 - `projects` - Project information
 - `buildings` - Building details
+- `sections` - Academic sections per year level
 - `section_assignments` - Section to building/room assignments
-- `user_assignments` - User academic and financial records
+- `teacher_assignments` - Teacher year/subject assignments
+- `schedules` - Class schedule definitions
+- `student_grades` - Recorded grades per subject/term
+- `user_assignments` - Student academic & financial records
 - `audit_log` - Admin action logs
 
 ## Migration from JSON

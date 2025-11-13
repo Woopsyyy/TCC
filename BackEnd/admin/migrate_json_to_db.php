@@ -11,7 +11,6 @@ $db = Database::getInstance();
 $conn = $db->getConnection();
 
 $queries = [
-    // announcements
     "CREATE TABLE IF NOT EXISTS announcements (
         id INT AUTO_INCREMENT PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -21,7 +20,6 @@ $queries = [
         date DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    // projects
     "CREATE TABLE IF NOT EXISTS projects (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -30,7 +28,6 @@ $queries = [
         completed ENUM('yes','no') DEFAULT 'no'
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    // buildings
     "CREATE TABLE IF NOT EXISTS buildings (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(10) NOT NULL UNIQUE,
@@ -38,7 +35,14 @@ $queries = [
         rooms_per_floor INT DEFAULT 4
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    // section assignments
+    "CREATE TABLE IF NOT EXISTS sections (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        year VARCHAR(10) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_year_name (year, name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
     "CREATE TABLE IF NOT EXISTS section_assignments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         year VARCHAR(10) NOT NULL,
@@ -49,18 +53,69 @@ $queries = [
         UNIQUE KEY uniq_year_section (year, section)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    // user assignments (store full name in username field for compatibility)
     "CREATE TABLE IF NOT EXISTS user_assignments (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(200) NOT NULL UNIQUE,
+        user_id INT DEFAULT NULL,
+        username VARCHAR(200) NOT NULL,
         year VARCHAR(10) NOT NULL,
         section VARCHAR(100) NOT NULL,
         department VARCHAR(100) DEFAULT NULL,
         payment ENUM('paid','owing') DEFAULT 'paid',
-        sanctions TEXT DEFAULT NULL
+        sanctions TEXT DEFAULT NULL,
+        owing_amount VARCHAR(64) DEFAULT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+        UNIQUE KEY uniq_username (username),
+        INDEX idx_user_id (user_id),
+        INDEX idx_username (username)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    // audit log
+    "CREATE TABLE IF NOT EXISTS teacher_assignments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT DEFAULT NULL,
+        username VARCHAR(200) NOT NULL,
+        year VARCHAR(10) NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user_id (user_id),
+        INDEX idx_username (username),
+        INDEX idx_year (year),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+    "CREATE TABLE IF NOT EXISTS schedules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        year VARCHAR(10) NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        day VARCHAR(20) NOT NULL,
+        time_start TIME NOT NULL,
+        time_end TIME NOT NULL,
+        room VARCHAR(100) DEFAULT NULL,
+        instructor VARCHAR(255) DEFAULT NULL,
+        section VARCHAR(100) DEFAULT NULL,
+        building VARCHAR(10) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_year (year),
+        INDEX idx_subject (subject),
+        INDEX idx_day (day)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+    "CREATE TABLE IF NOT EXISTS student_grades (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT DEFAULT NULL,
+        username VARCHAR(255) NOT NULL,
+        year VARCHAR(20) NOT NULL,
+        semester VARCHAR(20) NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        instructor VARCHAR(255) DEFAULT NULL,
+        prelim_grade DECIMAL(5,2) DEFAULT NULL,
+        midterm_grade DECIMAL(5,2) DEFAULT NULL,
+        finals_grade DECIMAL(5,2) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
     "CREATE TABLE IF NOT EXISTS audit_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
         admin_user VARCHAR(100),
@@ -78,43 +133,54 @@ foreach ($queries as $q) {
     }
 }
 
-// ensure user_assignments has the new columns (for older installs)
-$cols = [
-    'department' => "VARCHAR(100) DEFAULT NULL",
-    'payment' => "ENUM('paid','owing') DEFAULT 'paid'",
-    'sanctions' => "TEXT DEFAULT NULL",
-    'owing_amount' => "VARCHAR(64) DEFAULT NULL",
-];
-foreach ($cols as $col => $def) {
-    // check if column exists
+// user_assignments upgrades for older installs
+$legacyCols = ['department','payment','sanctions','owing_amount','user_id'];
+foreach ($legacyCols as $col) {
     $chk = $conn->prepare("SELECT COUNT(*) as c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_assignments' AND COLUMN_NAME = ?");
     $chk->bind_param('s', $col);
     $chk->execute();
     $res = $chk->get_result();
     $row = $res->fetch_assoc();
     if (isset($row['c']) && intval($row['c']) === 0) {
-        $sql = "ALTER TABLE user_assignments ADD COLUMN $col $def";
-        if (!$conn->query($sql)) {
+        $alterSql = '';
+        switch ($col) {
+            case 'department':
+                $alterSql = "ALTER TABLE user_assignments ADD COLUMN department VARCHAR(100) DEFAULT NULL";
+                break;
+            case 'payment':
+                $alterSql = "ALTER TABLE user_assignments ADD COLUMN payment ENUM('paid','owing') DEFAULT 'paid'";
+                break;
+            case 'sanctions':
+                $alterSql = "ALTER TABLE user_assignments ADD COLUMN sanctions TEXT DEFAULT NULL";
+                break;
+            case 'owing_amount':
+                $alterSql = "ALTER TABLE user_assignments ADD COLUMN owing_amount VARCHAR(64) DEFAULT NULL";
+                break;
+            case 'user_id':
+                $alterSql = "ALTER TABLE user_assignments ADD COLUMN user_id INT DEFAULT NULL";
+                break;
+        }
+        if ($alterSql && !$conn->query($alterSql)) {
             echo "Error adding column $col: " . $conn->error . "\n";
-        } else {
-            echo "Added column $col to user_assignments\n";
         }
     }
 }
 
-// ensure user_id column exists for mapping to canonical users table
-$col = 'user_id';
-$chk = $conn->prepare("SELECT COUNT(*) as c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_assignments' AND COLUMN_NAME = ?");
-$chk->bind_param('s', $col);
-$chk->execute();
-$res = $chk->get_result();
-$row = $res->fetch_assoc();
-if (isset($row['c']) && intval($row['c']) === 0) {
-    $sql = "ALTER TABLE user_assignments ADD COLUMN user_id INT DEFAULT NULL";
-    if (!$conn->query($sql)) {
-        echo "Error adding column user_id: " . $conn->error . "\n";
-    } else {
-        echo "Added column user_id to user_assignments\n";
+$indexChecks = [
+    'uniq_username' => "ALTER TABLE user_assignments ADD UNIQUE KEY uniq_username (username)",
+    'idx_user_id' => "ALTER TABLE user_assignments ADD INDEX idx_user_id (user_id)",
+    'idx_username' => "ALTER TABLE user_assignments ADD INDEX idx_username (username)"
+];
+foreach ($indexChecks as $indexName => $sql) {
+    $chk = $conn->prepare("SELECT COUNT(*) as c FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_assignments' AND INDEX_NAME = ?");
+    $chk->bind_param('s', $indexName);
+    $chk->execute();
+    $res = $chk->get_result();
+    $row = $res->fetch_assoc();
+    if (isset($row['c']) && intval($row['c']) === 0) {
+        if (!$conn->query($sql)) {
+            echo "Error adding index $indexName: " . $conn->error . "\n";
+        }
     }
 }
 

@@ -21,6 +21,34 @@ $schoolId = $_SESSION['school_id'] ?? '';
 $userRole = $_SESSION['role'] ?? 'admin';
 $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
 
+// Redirect old user_management URLs to manage_students (preserve query parameters)
+if ($section === 'user_management') {
+  $params = $_GET;
+  $params['section'] = 'manage_students';
+  // Preserve tab parameter if it exists, otherwise default to students
+  if (isset($params['tab'])) {
+    if ($params['tab'] === 'teachers') {
+      $params['section'] = 'manage_teachers';
+      unset($params['tab']);
+    } elseif ($params['tab'] === 'schedules') {
+      $params['section'] = 'schedule_management';
+      unset($params['tab']);
+    } else {
+      unset($params['tab']); // students tab -> manage_students
+    }
+  }
+  header('Location: /TCC/public/admin_dashboard.php?' . http_build_query($params));
+  exit();
+}
+
+// Temporarily route deprecated sections back to student management
+if ($section === 'manage_teachers' || $section === 'schedule_management') {
+  $params = $_GET;
+  $params['section'] = 'manage_students';
+  header('Location: /TCC/public/admin_dashboard.php?' . http_build_query($params));
+  exit();
+}
+
 if (empty($schoolId)) {
   try {
     require_once __DIR__ . '/../BackEnd/database/db.php';
@@ -61,16 +89,14 @@ if (empty($schoolId)) {
     <link rel="stylesheet" href="css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="css/home.css" />
-    <title>Admin Dashboard</title>
     <link rel="stylesheet" href="css/admin_dashboard.css" />
+    <link rel="stylesheet" href="css/admin_sidebar.css" />
+    <title>Admin Dashboard</title>
   </head>
   <body class="admin-dashboard">
-    <div class="page-container">
-      <aside class="sidebar">
-        <div class="sidebar-glass"></div>
-        <!-- Edit User Modal -->
-        <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
-          <div class="modal-dialog modal-lg">
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
             <div class="modal-content">
               <form method="post" action="/TCC/BackEnd/admin/manage_users.php">
                 <input type="hidden" name="action" value="update" />
@@ -82,20 +108,20 @@ if (empty($schoolId)) {
                 </div>
                 <div class="modal-body">
                   <div class="mb-3">
-                    <label class="admin-form-label"><i class="bi bi-person-badge"></i> Full Name</label>
-                    <p id="modalFullNameDisplay" class="form-control-plaintext fw-bold fs-5"></p>
+                    <label class="admin-form-label" id="modalFullNameLabel"><i class="bi bi-person-badge"></i> Full Name</label>
+                    <p id="modalFullNameDisplay" class="form-control-plaintext fw-bold fs-5" aria-labelledby="modalFullNameLabel"></p>
                     <input type="hidden" name="full_name" id="modalFullName" />
                   </div>
                   <div class="row g-3">
                     <div class="col-md-6">
-                      <label class="admin-form-label"><i class="bi bi-wallet2"></i> Payment Status</label>
+                      <label class="admin-form-label" for="modalPayment"><i class="bi bi-wallet2"></i> Payment Status</label>
                       <select name="payment" id="modalPayment" class="form-select form-select-lg">
                         <option value="paid">Paid</option>
                         <option value="owing">Lacking Payment</option>
                       </select>
                     </div>
                     <div class="col-md-6">
-                      <label class="admin-form-label"><i class="bi bi-building"></i> Department</label>
+                      <label class="admin-form-label" for="modalDepartment"><i class="bi bi-building"></i> Department</label>
                       <select name="department" id="modalDepartment" class="form-select form-select-lg">
                         <option value="">(none)</option>
                         <option value="IT">IT</option>
@@ -107,11 +133,11 @@ if (empty($schoolId)) {
                     </div>
                   </div>
                   <div class="mb-3 mt-3" id="owingRow" style="display:none;">
-                    <label class="admin-form-label"><i class="bi bi-currency-dollar"></i> Amount Owing</label>
+                    <label class="admin-form-label" for="modalOwingAmount"><i class="bi bi-currency-dollar"></i> Amount Owing</label>
                     <input name="owing_amount" id="modalOwingAmount" class="form-control form-control-lg" placeholder="e.g. 2350.00" type="number" step="0.01" min="0"/>
                   </div>
                   <div class="mb-3">
-                    <label class="admin-form-label"><i class="bi bi-exclamation-triangle"></i> Sanctions (Days)</label>
+                    <label class="admin-form-label" for="modalSanctions"><i class="bi bi-exclamation-triangle"></i> Sanctions (Days)</label>
                     <input name="sanctions" id="modalSanctions" class="form-control form-control-lg" placeholder="Enter number of days (e.g. 3) or date (YYYY-MM-DD)" />
                     <small class="text-muted">Enter number of days for sanction duration, or a date in YYYY-MM-DD format</small>
                   </div>
@@ -128,6 +154,10 @@ if (empty($schoolId)) {
             </div>
           </div>
         </div>
+    </div>
+    <div class="page-container">
+      <aside class="sidebar">
+        <div class="sidebar-glass"></div>
         <div class="sidebar-top">
           <div class="sidebar-profile-tile">
             <img src="<?php echo htmlspecialchars($image); ?>" class="sidebar-logo" alt="admin"/>
@@ -144,9 +174,10 @@ if (empty($schoolId)) {
             <li><a href="/TCC/public/admin_dashboard.php?section=announcements" class="nav-link <?php echo ($section==='announcements')?'active':''?>" data-bs-toggle="tooltip" title="Announcements"><i class="bi bi-megaphone-fill"></i><span class="nav-label">Announcements</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=buildings" class="nav-link <?php echo ($section==='buildings')?'active':''?>" data-bs-toggle="tooltip" title="Buildings"><i class="bi bi-building"></i><span class="nav-label">Buildings</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=projects" class="nav-link <?php echo ($section==='projects')?'active':''?>" data-bs-toggle="tooltip" title="Projects"><i class="bi bi-folder-fill"></i><span class="nav-label">Projects</span></a></li>
-            <li><a href="/TCC/public/admin_dashboard.php?section=user_management" class="nav-link <?php echo ($section==='user_management')?'active':''?>" data-bs-toggle="tooltip" title="User Management"><i class="bi bi-people-fill"></i><span class="nav-label">User Management</span></a></li>
+            <li><a href="/TCC/public/admin_dashboard.php?section=manage_students" class="nav-link <?php echo ($section==='manage_students')?'active':''?>" data-bs-toggle="tooltip" title="Manage Students"><i class="bi bi-people-fill"></i><span class="nav-label">Manage Students</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=sections" class="nav-link <?php echo ($section==='sections')?'active':''?>" data-bs-toggle="tooltip" title="Sections"><i class="bi bi-collection-fill"></i><span class="nav-label">Sections</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=grade_system" class="nav-link <?php echo ($section==='grade_system')?'active':''?>" data-bs-toggle="tooltip" title="Grade System"><i class="bi bi-journal-bookmark-fill"></i><span class="nav-label">Grade System</span></a></li>
+            <li><a href="/TCC/public/admin_dashboard.php?section=settings" class="nav-link <?php echo ($section==='settings')?'active':''?>" data-bs-toggle="tooltip" title="Settings"><i class="bi bi-gear-fill"></i><span class="nav-label">Settings</span></a></li>
           </ul>
         </nav>
         <div class="sidebar-bottom">
@@ -173,9 +204,9 @@ if (empty($schoolId)) {
             'title' => 'Campus Projects',
             'copy' => 'Surface budgets, highlight completion milestones, and maintain transparency on ongoing initiatives.'
           ],
-          'user_management' => [
-            'title' => 'User Management',
-            'copy' => 'Handle assignments, monitor financial standing, and manage sanctions from a single cohesive space.'
+          'manage_students' => [
+            'title' => 'Manage Students',
+            'copy' => 'Handle student assignments, monitor financial standing, and manage sanctions.'
           ],
           'sections' => [
             'title' => 'Sections',
@@ -184,6 +215,10 @@ if (empty($schoolId)) {
           'grade_system' => [
             'title' => 'Grade System',
             'copy' => 'Manage student progress, semester summaries, and detailed records with the enhanced modal experience.'
+          ],
+          'settings' => [
+            'title' => 'Settings',
+            'copy' => 'Configure database backups, automate schedules, and keep administrative safeguards up to date.'
           ],
         ];
         $activeSpotlight = $heroSpotlights[$section] ?? $heroSpotlights['grade_system'];
@@ -209,9 +244,9 @@ if (empty($schoolId)) {
                 <i class="bi bi-folder-fill"></i>
                 <span>Projects</span>
               </a>
-              <a class="hero-action <?php echo ($section === 'user_management') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=user_management">
+              <a class="hero-action <?php echo ($section === 'manage_students') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=manage_students">
                 <i class="bi bi-people-fill"></i>
-                <span>Users</span>
+                <span>Students</span>
               </a>
               <a class="hero-action <?php echo ($section === 'sections') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=sections">
                 <i class="bi bi-collection-fill"></i>
@@ -219,7 +254,11 @@ if (empty($schoolId)) {
               </a>
               <a class="hero-action <?php echo ($section === 'grade_system') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=grade_system">
                 <i class="bi bi-journal-bookmark-fill"></i>
-                <span>Grades</span>
+                <span>Grade System</span>
+              </a>
+              <a class="hero-action <?php echo ($section === 'settings') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=settings">
+                <i class="bi bi-gear-fill"></i>
+                <span>Settings</span>
               </a>
               </div>
             </div>
@@ -229,15 +268,11 @@ if (empty($schoolId)) {
               <h2 class="spotlight-title"><?php echo htmlspecialchars($activeSpotlight['title']); ?></h2>
               <p class="spotlight-copy"><?php echo htmlspecialchars($activeSpotlight['copy']); ?></p>
               </div>
-            <div class="spotlight-card alt">
-              <span class="spotlight-eyebrow">Need to switch?</span>
-              <h2 class="spotlight-title">Jump to User View</h2>
-              <p class="spotlight-copy">Preview the student experience instantly to ensure everything looks just right.</p>
-              <a class="spotlight-link" href="/TCC/public/home.php">
-                <i class="bi bi-arrow-right-circle"></i>
-                Go to User Dashboard
-              </a>
-              </div>
+            <div class="spotlight-card alt clock-card">
+              <p class="clock-time"><span id="admClockTime">--:--</span><span class="clock-time-sub" id="admClockSub">--</span></p>
+              <p class="clock-day" id="admClockDay">Loading...</p>
+              <i class="bi bi-moon-stars clock-moon"></i>
+            </div>
           </div>
         </section>
 
@@ -301,11 +336,11 @@ if (empty($schoolId)) {
               </div>
                 <form class="form-small" action="/TCC/BackEnd/admin/save_announcement.php" method="post">
                   <?php if ($editRow): ?><input type="hidden" name="id" value="<?php echo (int)$editRow['id']; ?>" /><?php endif; ?>
-                  <div class="mb-2"><label class="form-label">Title</label><input name="title" class="form-control" required value="<?php echo $editRow ? htmlspecialchars($editRow['title']) : ''; ?>"/></div>
-                  <div class="mb-2"><label class="form-label">Content</label><textarea name="content" class="form-control" rows="3" required><?php echo $editRow ? htmlspecialchars($editRow['content']) : ''; ?></textarea></div>
+                  <div class="mb-2"><label class="form-label" for="announcementTitle">Title</label><input name="title" id="announcementTitle" class="form-control" required value="<?php echo $editRow ? htmlspecialchars($editRow['title']) : ''; ?>"/></div>
+                  <div class="mb-2"><label class="form-label" for="announcementContent">Content</label><textarea name="content" id="announcementContent" class="form-control" rows="3" required><?php echo $editRow ? htmlspecialchars($editRow['content']) : ''; ?></textarea></div>
                   <div class="row g-2 mb-2">
-                      <div class="col"><label class="form-label">Year</label><select name="year" class="form-select"><option value="">All</option><option value="1" <?php echo ($editRow && $editRow['year']=='1')?'selected':'';?>>1</option><option value="2" <?php echo ($editRow && $editRow['year']=='2')?'selected':'';?>>2</option><option value="3" <?php echo ($editRow && $editRow['year']=='3')?'selected':'';?>>3</option><option value="4" <?php echo ($editRow && $editRow['year']=='4')?'selected':'';?>>4</option></select></div>
-                      <div class="col"><label class="form-label">Department</label><select name="department" class="form-select"><option value="">All</option><option value="IT" <?php echo ($editRow && $editRow['department']=='IT')?'selected':'';?>>IT</option><option value="HM" <?php echo ($editRow && $editRow['department']=='HM')?'selected':'';?>>HM</option><option value="BSEED" <?php echo ($editRow && $editRow['department']=='BSEED')?'selected':'';?>>BSEED</option><option value="BEED" <?php echo ($editRow && $editRow['department']=='BEED')?'selected':'';?>>BEED</option><option value="TOURISM" <?php echo ($editRow && $editRow['department']=='TOURISM')?'selected':'';?>>TOURISM</option></select></div>
+                      <div class="col"><label class="form-label" for="announcementYear">Year</label><select name="year" id="announcementYear" class="form-select"><option value="">All</option><option value="1" <?php echo ($editRow && $editRow['year']=='1')?'selected':'';?>>1</option><option value="2" <?php echo ($editRow && $editRow['year']=='2')?'selected':'';?>>2</option><option value="3" <?php echo ($editRow && $editRow['year']=='3')?'selected':'';?>>3</option><option value="4" <?php echo ($editRow && $editRow['year']=='4')?'selected':'';?>>4</option></select></div>
+                      <div class="col"><label class="form-label" for="announcementDepartment">Department</label><select name="department" id="announcementDepartment" class="form-select"><option value="">All</option><option value="IT" <?php echo ($editRow && $editRow['department']=='IT')?'selected':'';?>>IT</option><option value="HM" <?php echo ($editRow && $editRow['department']=='HM')?'selected':'';?>>HM</option><option value="BSEED" <?php echo ($editRow && $editRow['department']=='BSEED')?'selected':'';?>>BSEED</option><option value="BEED" <?php echo ($editRow && $editRow['department']=='BEED')?'selected':'';?>>BEED</option><option value="TOURISM" <?php echo ($editRow && $editRow['department']=='TOURISM')?'selected':'';?>>TOURISM</option></select></div>
                   </div>
                   <button class="btn btn-primary"><?php echo $editRow ? 'Update Announcement' : 'Save Announcement'; ?></button>
                   <?php if ($editRow): ?><a href="/TCC/public/admin_dashboard.php?section=announcements" class="btn btn-secondary ms-2">Cancel</a><?php endif; ?>
@@ -493,16 +528,16 @@ if (empty($schoolId)) {
               <div class="card-body p-3">
                 <form class="row g-3 align-items-end" action="/TCC/BackEnd/admin/manage_buildings.php" method="post">
                   <div class="col-md-3">
-                    <label class="form-label fw-bold">Building</label>
-                    <input name="building" class="form-control" placeholder="A" required/>
+                    <label class="form-label fw-bold" for="buildingName">Building</label>
+                    <input name="building" id="buildingName" class="form-control" placeholder="A" required autocomplete="off"/>
                   </div>
                   <div class="col-md-3">
-                    <label class="form-label fw-bold">Floors</label>
-                    <input name="floors" type="number" class="form-control" value="4" min="1" required/>
+                    <label class="form-label fw-bold" for="buildingFloors">Floors</label>
+                    <input name="floors" id="buildingFloors" type="number" class="form-control" value="4" min="1" required autocomplete="off"/>
                   </div>
                   <div class="col-md-3">
-                    <label class="form-label fw-bold">Rooms per floor</label>
-                    <input name="rooms" type="number" class="form-control" value="4" min="1" required/>
+                    <label class="form-label fw-bold" for="buildingRooms">Rooms per floor</label>
+                    <input name="rooms" id="buildingRooms" type="number" class="form-control" value="4" min="1" required autocomplete="off"/>
                   </div>
                   <div class="col-md-3">
                     <label class="form-label d-block">&nbsp;</label>
@@ -641,8 +676,8 @@ if (empty($schoolId)) {
                   <div class="row g-3">
                     <div class="col-md-3">
                       <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
-                        <select name="year" class="form-select form-select-lg">
+                        <label class="admin-form-label" for="editSectionYear"><i class="bi bi-calendar-year"></i> Year</label>
+                        <select name="year" id="editSectionYear" class="form-select form-select-lg">
                         <option value="1" <?php echo ($editSectionRow['year']=='1')?'selected':'';?>>1st Year</option>
                         <option value="2" <?php echo ($editSectionRow['year']=='2')?'selected':'';?>>2nd Year</option>
                         <option value="3" <?php echo ($editSectionRow['year']=='3')?'selected':'';?>>3rd Year</option>
@@ -652,14 +687,14 @@ if (empty($schoolId)) {
                     </div>
                     <div class="col-md-3">
                       <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-people"></i> Section Name</label>
-                      <input name="section" class="form-control form-control-lg" value="<?php echo htmlspecialchars($editSectionRow['section']); ?>" required/>
+                        <label class="admin-form-label" for="editSectionName"><i class="bi bi-people"></i> Section Name</label>
+                      <input name="section" id="editSectionName" class="form-control form-control-lg" value="<?php echo htmlspecialchars($editSectionRow['section']); ?>" required autocomplete="off"/>
                       </div>
                     </div>
                     <div class="col-md-2">
                       <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-building"></i> Building</label>
-                        <select name="building" class="form-select form-select-lg" required>
+                        <label class="admin-form-label" for="editSectionBuilding"><i class="bi bi-building"></i> Building</label>
+                        <select name="building" id="editSectionBuilding" class="form-select form-select-lg" required>
                           <option value="">Select Building...</option>
                           <?php foreach (array_keys($buildings) as $bn): ?>
                           <option value="<?php echo htmlspecialchars($bn); ?>" <?php echo ($editSectionRow['building']===$bn)?'selected':'';?>><?php echo htmlspecialchars($bn); ?></option>
@@ -669,14 +704,14 @@ if (empty($schoolId)) {
                     </div>
                     <div class="col-md-2">
                       <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-layers"></i> Floor</label>
-                      <input name="floor" type="number" class="form-control form-control-lg" value="<?php echo (int)$editSectionRow['floor']; ?>" min="1" required/>
+                        <label class="admin-form-label" for="editSectionFloor"><i class="bi bi-layers"></i> Floor</label>
+                      <input name="floor" id="editSectionFloor" type="number" class="form-control form-control-lg" value="<?php echo (int)$editSectionRow['floor']; ?>" min="1" required autocomplete="off"/>
                       </div>
                     </div>
                     <div class="col-md-2">
                       <div class="admin-form-group">
-                        <label class="admin-form-label"><i class="bi bi-door-closed"></i> Room</label>
-                      <input name="room" class="form-control form-control-lg" value="<?php echo htmlspecialchars($editSectionRow['room']); ?>" required/>
+                        <label class="admin-form-label" for="editSectionRoom"><i class="bi bi-door-closed"></i> Room</label>
+                      <input name="room" id="editSectionRoom" class="form-control form-control-lg" value="<?php echo htmlspecialchars($editSectionRow['room']); ?>" required autocomplete="off"/>
                       </div>
                     </div>
                   </div>
@@ -707,8 +742,8 @@ if (empty($schoolId)) {
                 <div class="row g-3">
                   <div class="col-md-3">
                     <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
-                      <select name="year" class="form-select form-select-lg" required>
+                      <label class="admin-form-label" for="sectionYear"><i class="bi bi-calendar-year"></i> Year</label>
+                      <select name="year" id="sectionYear" class="form-select form-select-lg" required>
                         <option value="">Select Year...</option>
                         <option value="1">1st Year</option>
                         <option value="2">2nd Year</option>
@@ -719,14 +754,14 @@ if (empty($schoolId)) {
                   </div>
                   <div class="col-md-3">
                     <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-people"></i> Section Name</label>
-                      <input name="section" class="form-control form-control-lg" placeholder="Benevolence" required/>
+                      <label class="admin-form-label" for="sectionName"><i class="bi bi-people"></i> Section Name</label>
+                      <input name="section" id="sectionName" class="form-control form-control-lg" placeholder="Benevolence" required autocomplete="off"/>
                     </div>
                   </div>
                   <div class="col-md-2">
                     <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-building"></i> Building</label>
-                      <select name="building" class="form-select form-select-lg" required>
+                      <label class="admin-form-label" for="sectionBuilding"><i class="bi bi-building"></i> Building</label>
+                      <select name="building" id="sectionBuilding" class="form-select form-select-lg" required>
                         <option value="">Select Building...</option>
                         <?php foreach (array_keys($buildings) as $bn): ?>
                           <option value="<?php echo htmlspecialchars($bn); ?>"><?php echo htmlspecialchars($bn); ?></option>
@@ -736,14 +771,14 @@ if (empty($schoolId)) {
                   </div>
                   <div class="col-md-2">
                     <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-layers"></i> Floor</label>
-                      <input name="floor" type="number" class="form-control form-control-lg" value="1" min="1" required/>
+                      <label class="admin-form-label" for="sectionFloor"><i class="bi bi-layers"></i> Floor</label>
+                      <input name="floor" id="sectionFloor" type="number" class="form-control form-control-lg" value="1" min="1" required autocomplete="off"/>
                     </div>
                   </div>
                   <div class="col-md-2">
                     <div class="admin-form-group">
-                      <label class="admin-form-label"><i class="bi bi-door-closed"></i> Room</label>
-                      <input name="room" class="form-control form-control-lg" placeholder="301" required/>
+                      <label class="admin-form-label" for="sectionRoom"><i class="bi bi-door-closed"></i> Room</label>
+                      <input name="room" id="sectionRoom" class="form-control form-control-lg" placeholder="301" required autocomplete="off"/>
                     </div>
                   </div>
                 </div>
@@ -922,9 +957,9 @@ if (empty($schoolId)) {
                     <h3>Create New Project</h3>
                   </div>
                   <form class="form-small" action="/TCC/BackEnd/admin/manage_projects.php" method="post">
-                    <div class="mb-2"><label class="form-label">Project Name</label><input name="name" class="form-control" required/></div>
-                    <div class="mb-2 row g-2"><div class="col"><label class="form-label">Budget</label><input name="budget" class="form-control" required/></div><div class="col"><label class="form-label">Started</label><input name="started" type="date" class="form-control" required/></div></div>
-                    <div class="mb-2"><label class="form-label">Completed?</label><select name="completed" class="form-select"><option value="no">No</option><option value="yes">Yes</option></select></div>
+                    <div class="mb-2"><label class="form-label" for="projectName">Project Name</label><input name="name" id="projectName" class="form-control" required autocomplete="organization"/></div>
+                    <div class="mb-2 row g-2"><div class="col"><label class="form-label" for="projectBudget">Budget</label><input name="budget" id="projectBudget" class="form-control" required autocomplete="off"/></div><div class="col"><label class="form-label" for="projectStarted">Started</label><input name="started" id="projectStarted" type="date" class="form-control" required autocomplete="off"/></div></div>
+                    <div class="mb-2"><label class="form-label" for="projectCompleted">Completed?</label><select name="completed" id="projectCompleted" class="form-select"><option value="no">No</option><option value="yes">Yes</option></select></div>
                     <button class="btn btn-primary">Save Project</button>
                   </form>
                 </div>
@@ -1008,7 +1043,7 @@ if (empty($schoolId)) {
               </div>
             </div>
 
-          <?php elseif ($section === 'user_management'): ?>
+          <?php elseif ($section === 'manage_students'): ?>
             <?php
             require_once __DIR__ . '/../BackEnd/database/db.php';
             $conn = Database::getInstance()->getConnection();
@@ -1071,14 +1106,6 @@ if (empty($schoolId)) {
               }
             }
             ?>
-            <div class="records-container">
-              <div class="records-header">
-                <h2 class="records-title">
-                  <i class="bi bi-people-fill"></i> User Management
-                </h2>
-                <p class="records-subtitle">Manage user assignments, financial status, and sanctions</p>
-              </div>
-              <div class="records-main">
             <?php
 
             // pagination
@@ -1137,26 +1164,9 @@ if (empty($schoolId)) {
               $selStmt->close();
             }
             
-            // Get active tab from URL or default to students
-            $activeTab = 'students';
-            if (isset($_GET['tab'])) {
-              if ($_GET['tab'] === 'teachers') {
-                $activeTab = 'teachers';
-              } elseif ($_GET['tab'] === 'schedules') {
-                $activeTab = 'schedules';
-              }
-            }
-            
-            // Handle user management toasts
+            // Handle student management toasts
             if (isset($_GET['success'])) {
-              $successMsg = $_GET['success'];
-              if ($successMsg === 'teacher_assigned') {
-                $toastMessage = 'Teacher assigned successfully!';
-              } elseif ($successMsg === 'teacher_deleted') {
-                $toastMessage = 'Teacher assignment deleted successfully!';
-              } else {
-                $toastMessage = 'User assignment saved successfully!';
-              }
+              $toastMessage = 'User assignment saved successfully!';
               $toastType = 'success';
             } elseif (isset($_GET['updated'])) {
               $toastMessage = 'User assignment updated successfully!';
@@ -1175,39 +1185,15 @@ if (empty($schoolId)) {
                 $toastMessage = 'Error: ' . htmlspecialchars($errorMsg);
               }
             }
-            
-            // Get teacher assignments
-            $teacherAssignments = [];
-            $teacherQuery = $conn->query("SELECT ta.id, ta.username, ta.year, ta.subject, ta.user_id, u.full_name, COALESCE(u.role, 'teacher') as role FROM teacher_assignments ta LEFT JOIN users u ON ta.user_id = u.id ORDER BY ta.year, ta.subject, ta.username");
-            if ($teacherQuery) {
-              while ($row = $teacherQuery->fetch_assoc()) {
-                $teacherAssignments[] = $row;
-              }
-            }
             ?>
-            
-            <!-- Tab Navigation -->
-            <ul class="nav nav-tabs mb-4" id="userManagementTabs" role="tablist" style="border-bottom: 2px solid var(--color-sage);">
-              <li class="nav-item" role="presentation">
-                <button class="nav-link <?php echo $activeTab === 'students' ? 'active' : ''; ?>" id="students-tab" data-bs-toggle="tab" data-bs-target="#students-pane" type="button" role="tab" aria-controls="students-pane" aria-selected="<?php echo $activeTab === 'students' ? 'true' : 'false'; ?>" style="color: var(--color-sage); font-weight: 600; padding: 12px 24px;">
-                  <i class="bi bi-people-fill me-2"></i>Manage Students
-                </button>
-              </li>
-              <li class="nav-item" role="presentation">
-                <button class="nav-link <?php echo $activeTab === 'teachers' ? 'active' : ''; ?>" id="teachers-tab" data-bs-toggle="tab" data-bs-target="#teachers-pane" type="button" role="tab" aria-controls="teachers-pane" aria-selected="<?php echo $activeTab === 'teachers' ? 'true' : 'false'; ?>" style="color: var(--color-sage); font-weight: 600; padding: 12px 24px;">
-                  <i class="bi bi-person-badge me-2"></i>Manage Teachers
-                </button>
-              </li>
-              <li class="nav-item" role="presentation">
-                <button class="nav-link <?php echo $activeTab === 'schedules' ? 'active' : ''; ?>" id="schedules-tab" data-bs-toggle="tab" data-bs-target="#schedules-pane" type="button" role="tab" aria-controls="schedules-pane" aria-selected="<?php echo $activeTab === 'schedules' ? 'true' : 'false'; ?>" style="color: var(--color-sage); font-weight: 600; padding: 12px 24px;">
-                  <i class="bi bi-calendar-week me-2"></i>Schedule Management
-                </button>
-              </li>
-            </ul>
-
-            <div class="tab-content" id="userManagementTabContent">
-              <!-- Students Tab -->
-              <div class="tab-pane fade <?php echo $activeTab === 'students' ? 'show active' : ''; ?>" id="students-pane" role="tabpanel" aria-labelledby="students-tab">
+            <div class="records-container">
+              <div class="records-header">
+                <h2 class="records-title">
+                  <i class="bi bi-people-fill"></i> Manage Students
+                </h2>
+                <p class="records-subtitle">Manage student assignments, financial status, and sanctions</p>
+              </div>
+              <div class="records-main">
                 <div class="info-card">
               <div class="card-header-modern">
                 <i class="bi bi-person-plus"></i>
@@ -1296,7 +1282,7 @@ if (empty($schoolId)) {
                     </div>
                   </div>
                   <?php if ($filterYear !== '' || $filterSection !== '' || $filterDept !== '' || $filterLacking || $filterSanctions || $q !== ''): ?>
-                    <a href="/TCC/public/admin_dashboard.php?section=user_management" class="grade-filter-reset">
+                    <a href="/TCC/public/admin_dashboard.php?section=manage_students" class="grade-filter-reset">
                       <i class="bi bi-arrow-counterclockwise"></i> Reset view
                     </a>
                   <?php endif; ?>
@@ -1304,17 +1290,18 @@ if (empty($schoolId)) {
                 
                 <!-- Search Bar -->
                 <form method="get" class="mb-3">
-                  <input type="hidden" name="section" value="user_management" />
+                  <input type="hidden" name="section" value="manage_students" />
                   <input type="hidden" name="year_filter" value="<?php echo htmlspecialchars($filterYear); ?>" />
                   <input type="hidden" name="section_filter" value="<?php echo htmlspecialchars($filterSection); ?>" />
                   <input type="hidden" name="dept_filter" value="<?php echo htmlspecialchars($filterDept); ?>" />
                   <input type="hidden" name="lacking_payment" value="<?php echo $filterLacking ? '1' : ''; ?>" />
                   <input type="hidden" name="has_sanctions" value="<?php echo $filterSanctions ? '1' : ''; ?>" />
                   <div class="input-group input-group-lg">
+                    <label for="userSearchQuery" class="visually-hidden">Search users</label>
                     <span class="input-group-text" style="background: rgba(107, 95, 79, 0.12); border: 1px solid rgba(107, 95, 79, 0.3);">
                       <i class="bi bi-search"></i>
                     </span>
-                    <input type="search" name="q" class="form-control" placeholder="Search by full name, section, or department..." value="<?php echo htmlspecialchars($q); ?>" style="border: 1px solid rgba(107, 95, 79, 0.3);" />
+                    <input type="search" name="q" id="userSearchQuery" class="form-control" placeholder="Search by full name, section, or department..." value="<?php echo htmlspecialchars($q); ?>" style="border: 1px solid rgba(107, 95, 79, 0.3);" autocomplete="off" />
                     <?php if ($q !== ''): ?>
                       <button type="submit" class="btn btn-primary">
                         <i class="bi bi-funnel-fill"></i> Search
@@ -1329,7 +1316,7 @@ if (empty($schoolId)) {
                     <span class="grade-filter-label">Year Level</span>
                     <?php 
                     $filterBase = $_GET;
-                    $filterBase['section'] = 'user_management';
+                    $filterBase['section'] = 'manage_students';
                     unset($filterBase['year_filter']);
                     $yearBase = $filterBase;
                     $yearAllUrl = '/TCC/public/admin_dashboard.php?' . htmlspecialchars(http_build_query($yearBase));
@@ -1638,15 +1625,71 @@ if (empty($schoolId)) {
               <?php endif; ?>
                 </div>
               </div>
-              
-              <!-- Teachers Tab -->
-              <div class="tab-pane fade <?php echo $activeTab === 'teachers' ? 'show active' : ''; ?>" id="teachers-pane" role="tabpanel" aria-labelledby="teachers-tab">
+            </div>
+          </div>
+
+          <?php elseif ($section === 'manage_teachers'): ?>
+            <?php
+            require_once __DIR__ . '/../BackEnd/database/db.php';
+            $conn = Database::getInstance()->getConnection();
+            
+            // Ensure teacher_assignments table exists
+            $conn->query("CREATE TABLE IF NOT EXISTS teacher_assignments (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              user_id INT DEFAULT NULL,
+              username VARCHAR(200) NOT NULL,
+              year VARCHAR(10) NOT NULL,
+              subject VARCHAR(255) NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              INDEX idx_user_id (user_id),
+              INDEX idx_username (username),
+              INDEX idx_year (year)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            
+            // Handle teacher management toasts
+            if (isset($_GET['success'])) {
+              $successMsg = $_GET['success'];
+              if ($successMsg === 'teacher_assigned') {
+                $toastMessage = 'Teacher assigned successfully!';
+              } elseif ($successMsg === 'teacher_deleted') {
+                $toastMessage = 'Teacher assignment deleted successfully!';
+              } else {
+                $toastMessage = 'Teacher assignment saved successfully!';
+              }
+              $toastType = 'success';
+            } elseif (isset($_GET['error'])) {
+              $toastType = 'error';
+              $errorMsg = $_GET['error'];
+              if ($errorMsg === 'user_not_found') {
+                $toastMessage = 'Error: User does not exist in the database. Please check the username or full name.';
+              } else {
+                $toastMessage = 'Error: ' . htmlspecialchars($errorMsg);
+              }
+            }
+            
+            // Get teacher assignments
+            $teacherAssignments = [];
+            $teacherQuery = $conn->query("SELECT ta.id, ta.username, ta.year, ta.subject, ta.user_id, u.full_name, COALESCE(u.role, 'teacher') as role FROM teacher_assignments ta LEFT JOIN users u ON ta.user_id = u.id ORDER BY ta.year, ta.subject, ta.username");
+            if ($teacherQuery) {
+              while ($row = $teacherQuery->fetch_assoc()) {
+                $teacherAssignments[] = $row;
+              }
+            }
+            ?>
+            <div class="records-container">
+              <div class="records-header">
+                <h2 class="records-title">
+                  <i class="bi bi-person-badge"></i> Manage Teachers
+                </h2>
+                <p class="records-subtitle">Assign teachers to years and subjects, manage instructor assignments</p>
+              </div>
+              <div class="records-main">
                 <div class="info-card">
                   <div class="card-header-modern">
                     <i class="bi bi-person-badge"></i>
                     <h3>Assign Teacher to Year / Subject</h3>
                   </div>
-                  <form action="/TCC/BackEnd/admin/manage_users.php" method="post" class="admin-user-assign-form">
+                  <form action="/TCC/BackEnd/admin/manage_users.php" method="post" class="admin-user-assign-form" id="assignTeacherForm">
                     <input type="hidden" name="action" value="assign_teacher" />
                     <input type="hidden" id="teacherUserIdHidden" name="existing_user_id" value="" />
                     <div class="row g-3">
@@ -1772,30 +1815,40 @@ if (empty($schoolId)) {
                   </div>
                 </div>
               </div>
-              
-              <!-- Schedules Tab -->
-              <div class="tab-pane fade <?php echo $activeTab === 'schedules' ? 'show active' : ''; ?>" id="schedules-pane" role="tabpanel" aria-labelledby="schedules-tab">
-                <?php
-                // Ensure schedules table exists
-                $conn->query("CREATE TABLE IF NOT EXISTS schedules (
-                  id INT AUTO_INCREMENT PRIMARY KEY,
-                  year VARCHAR(10) NOT NULL,
-                  subject VARCHAR(255) NOT NULL,
-                  day VARCHAR(20) NOT NULL,
-                  time_start TIME NOT NULL,
-                  time_end TIME NOT NULL,
-                  room VARCHAR(100) DEFAULT NULL,
-                  instructor VARCHAR(255) DEFAULT NULL,
-                  section VARCHAR(100) DEFAULT NULL,
-                  building VARCHAR(10) DEFAULT NULL,
-                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                  INDEX idx_year (year),
-                  INDEX idx_subject (subject),
-                  INDEX idx_day (day)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-                
-                // Get available buildings for dropdown
+            </div>
+          </div>
+
+          <?php elseif ($section === 'schedule_management'): ?>
+            <?php
+            require_once __DIR__ . '/../BackEnd/database/db.php';
+            $conn = Database::getInstance()->getConnection();
+            
+            // Ensure schedules table exists
+            $conn->query("CREATE TABLE IF NOT EXISTS schedules (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              year VARCHAR(10) NOT NULL,
+              subject VARCHAR(255) NOT NULL,
+              day VARCHAR(20) NOT NULL,
+              time_start TIME NOT NULL,
+              time_end TIME NOT NULL,
+              room VARCHAR(100) DEFAULT NULL,
+              instructor VARCHAR(255) DEFAULT NULL,
+              section VARCHAR(100) DEFAULT NULL,
+              building VARCHAR(10) DEFAULT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              INDEX idx_year (year),
+              INDEX idx_subject (subject),
+              INDEX idx_day (day)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            
+            // Check if building column exists, if not add it
+            $columns = $conn->query("SHOW COLUMNS FROM schedules LIKE 'building'");
+            if ($columns->num_rows === 0) {
+              $conn->query("ALTER TABLE schedules ADD COLUMN building VARCHAR(10) DEFAULT NULL AFTER section");
+            }
+            
+            // Get available buildings for dropdown
                 $availableBuildings = [];
                 $buildingsQuery = $conn->query("SELECT name FROM buildings ORDER BY name");
                 if ($buildingsQuery) {
@@ -1918,7 +1971,14 @@ if (empty($schoolId)) {
                   }
                 }
                 ?>
-                
+            <div class="records-container">
+              <div class="records-header">
+                <h2 class="records-title">
+                  <i class="bi bi-calendar-week"></i> Schedule Management
+                </h2>
+                <p class="records-subtitle">Create and manage class schedules, assign rooms and instructors</p>
+              </div>
+              <div class="records-main">
                 <div class="info-card">
                   <div class="card-header-modern">
                     <i class="bi bi-calendar-plus"></i>
@@ -1935,8 +1995,8 @@ if (empty($schoolId)) {
                     <div class="row g-3">
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
-                          <select name="year" class="form-select form-select-lg" required>
+                          <label class="admin-form-label" for="scheduleYear"><i class="bi bi-calendar-year"></i> Year</label>
+                          <select name="year" id="scheduleYear" class="form-select form-select-lg" required>
                             <option value="">Select Year...</option>
                             <option value="1" <?php echo ($editScheduleRow && $editScheduleRow['year']=='1')?'selected':'';?>>1st Year</option>
                             <option value="2" <?php echo ($editScheduleRow && $editScheduleRow['year']=='2')?'selected':'';?>>2nd Year</option>
@@ -1947,14 +2007,14 @@ if (empty($schoolId)) {
                       </div>
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-book"></i> Subject</label>
-                          <input type="text" name="subject" class="form-control form-control-lg" placeholder="e.g. Mathematics" required value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['subject']) : ''; ?>"/>
+                          <label class="admin-form-label" for="scheduleSubject"><i class="bi bi-book"></i> Subject</label>
+                          <input type="text" name="subject" id="scheduleSubject" class="form-control form-control-lg" placeholder="e.g. Mathematics" required value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['subject']) : ''; ?>"/>
                         </div>
                       </div>
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-calendar-day"></i> Day</label>
-                          <select name="day" class="form-select form-select-lg" required>
+                          <label class="admin-form-label" for="scheduleDay"><i class="bi bi-calendar-day"></i> Day</label>
+                          <select name="day" id="scheduleDay" class="form-select form-select-lg" required>
                             <option value="">Select Day...</option>
                             <option value="Monday" <?php echo ($editScheduleRow && $editScheduleRow['day']=='Monday')?'selected':'';?>>Monday</option>
                             <option value="Tuesday" <?php echo ($editScheduleRow && $editScheduleRow['day']=='Tuesday')?'selected':'';?>>Tuesday</option>
@@ -1968,38 +2028,38 @@ if (empty($schoolId)) {
                       </div>
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-clock"></i> Time Start</label>
-                          <input type="time" name="time_start" class="form-control form-control-lg" required value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['time_start']) : ''; ?>"/>
+                          <label class="admin-form-label" for="scheduleTimeStart"><i class="bi bi-clock"></i> Time Start</label>
+                          <input type="time" name="time_start" id="scheduleTimeStart" class="form-control form-control-lg" required value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['time_start']) : ''; ?>"/>
                         </div>
                       </div>
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-clock-history"></i> Time End</label>
-                          <input type="time" name="time_end" class="form-control form-control-lg" required value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['time_end']) : ''; ?>"/>
+                          <label class="admin-form-label" for="scheduleTimeEnd"><i class="bi bi-clock-history"></i> Time End</label>
+                          <input type="time" name="time_end" id="scheduleTimeEnd" class="form-control form-control-lg" required value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['time_end']) : ''; ?>"/>
                         </div>
                       </div>
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-door-closed"></i> Room</label>
-                          <input type="text" name="room" class="form-control form-control-lg" placeholder="e.g. Room 301" value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['room'] ?? '') : ''; ?>"/>
+                          <label class="admin-form-label" for="scheduleRoom"><i class="bi bi-door-closed"></i> Room</label>
+                          <input type="text" name="room" id="scheduleRoom" class="form-control form-control-lg" placeholder="e.g. Room 301" value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['room'] ?? '') : ''; ?>"/>
                         </div>
                       </div>
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-person-badge"></i> Instructor</label>
-                          <input type="text" name="instructor" class="form-control form-control-lg" placeholder="e.g. Ms. Johnson" value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['instructor'] ?? '') : ''; ?>"/>
+                          <label class="admin-form-label" for="scheduleInstructor"><i class="bi bi-person-badge"></i> Instructor</label>
+                          <input type="text" name="instructor" id="scheduleInstructor" class="form-control form-control-lg" placeholder="e.g. Ms. Johnson" value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['instructor'] ?? '') : ''; ?>"/>
                         </div>
                       </div>
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-people"></i> Section</label>
-                          <input type="text" name="section" class="form-control form-control-lg" placeholder="e.g. Benevolence" value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['section'] ?? '') : ''; ?>"/>
+                          <label class="admin-form-label" for="scheduleSection"><i class="bi bi-people"></i> Section</label>
+                          <input type="text" name="section" id="scheduleSection" class="form-control form-control-lg" placeholder="e.g. Benevolence" value="<?php echo $editScheduleRow ? htmlspecialchars($editScheduleRow['section'] ?? '') : ''; ?>"/>
                         </div>
                       </div>
                       <div class="col-md-3">
                         <div class="admin-form-group">
-                          <label class="admin-form-label"><i class="bi bi-building"></i> Building</label>
-                          <select name="building" class="form-select form-select-lg">
+                          <label class="admin-form-label" for="scheduleBuilding"><i class="bi bi-building"></i> Building</label>
+                          <select name="building" id="scheduleBuilding" class="form-select form-select-lg">
                             <option value="">Select Building...</option>
                             <?php foreach ($availableBuildings as $bld): ?>
                               <option value="<?php echo htmlspecialchars($bld); ?>" <?php echo ($editScheduleRow && isset($editScheduleRow['building']) && $editScheduleRow['building']===$bld)?'selected':'';?>><?php echo htmlspecialchars($bld); ?></option>
@@ -2014,7 +2074,7 @@ if (empty($schoolId)) {
                           <i class="bi bi-check-circle me-2"></i><?php echo $editScheduleRow ? 'Update Schedule' : 'Create Schedule'; ?>
                         </button>
                         <?php if ($editScheduleRow): ?>
-                          <a href="/TCC/public/admin_dashboard.php?section=user_management&tab=schedules" class="btn btn-secondary btn-lg ms-2">
+                          <a href="/TCC/public/admin_dashboard.php?section=schedule_management" class="btn btn-secondary btn-lg ms-2">
                             <i class="bi bi-x-circle me-2"></i>Cancel
                           </a>
                         <?php endif; ?>
@@ -2035,7 +2095,7 @@ if (empty($schoolId)) {
                         </div>
                       </div>
                       <?php if ($scheduleFilterYear !== '' || $scheduleFilterSubject !== ''): ?>
-                        <a href="/TCC/public/admin_dashboard.php?section=user_management&tab=schedules" class="grade-filter-reset">
+                        <a href="/TCC/public/admin_dashboard.php?section=schedule_management" class="grade-filter-reset">
                           <i class="bi bi-arrow-counterclockwise"></i> Reset view
                         </a>
                       <?php endif; ?>
@@ -2047,8 +2107,7 @@ if (empty($schoolId)) {
                         <span class="grade-filter-label">Year Level</span>
                         <?php 
                         $scheduleFilterBase = $_GET;
-                        $scheduleFilterBase['section'] = 'user_management';
-                        $scheduleFilterBase['tab'] = 'schedules';
+                        $scheduleFilterBase['section'] = 'schedule_management';
                         unset($scheduleFilterBase['schedule_year_filter']);
                         $scheduleYearBase = $scheduleFilterBase;
                         $scheduleYearAllUrl = '/TCC/public/admin_dashboard.php?' . htmlspecialchars(http_build_query($scheduleYearBase));
@@ -2154,7 +2213,7 @@ if (empty($schoolId)) {
                               <td><?php echo htmlspecialchars($sched['building'] ?: '-'); ?></td>
                               <td>
                                 <div style="display: flex; gap: 8px;">
-                                  <a href="/TCC/public/admin_dashboard.php?section=user_management&tab=schedules&edit_schedule_id=<?php echo (int)$sched['id']; ?>" class="Btn Btn-edit">
+                                  <a href="/TCC/public/admin_dashboard.php?section=schedule_management&edit_schedule_id=<?php echo (int)$sched['id']; ?>" class="Btn Btn-edit">
                                     <div class="svgWrapper">
                                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 42 42" class="svgIcon">
                                         <path stroke-width="5" stroke="#fff" d="M21 5L7 19L5 37L23 35L37 21L21 5Z"></path>
@@ -2188,8 +2247,8 @@ if (empty($schoolId)) {
                 </div>
               </div>
             </div>
-              </div>
-            </div>
+          </div>
+
           <?php elseif ($section === 'sections'): ?>
             <?php
             require_once __DIR__ . '/../BackEnd/database/db.php';
@@ -2281,8 +2340,8 @@ if (empty($schoolId)) {
                     
                     <div class="row g-3 mb-3">
                       <div class="col-md-6">
-                        <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
-                        <select name="year" class="form-select form-select-lg" required>
+                        <label class="admin-form-label" for="sectionFormYear"><i class="bi bi-calendar-year"></i> Year</label>
+                        <select name="year" id="sectionFormYear" class="form-select form-select-lg" required>
                           <option value="">Select Year...</option>
                           <option value="1" <?php echo ($editSectionRow && $editSectionRow['year']=='1')?'selected':'';?>>1st Year</option>
                           <option value="2" <?php echo ($editSectionRow && $editSectionRow['year']=='2')?'selected':'';?>>2nd Year</option>
@@ -2291,8 +2350,8 @@ if (empty($schoolId)) {
                         </select>
                       </div>
                       <div class="col-md-6">
-                        <label class="admin-form-label"><i class="bi bi-tag-fill"></i> Section Name</label>
-                        <input name="name" class="form-control form-control-lg" placeholder="e.g. Power, Benevolence, Excellence" required value="<?php echo $editSectionRow ? htmlspecialchars($editSectionRow['name']) : ''; ?>"/>
+                        <label class="admin-form-label" for="sectionFormName"><i class="bi bi-tag-fill"></i> Section Name</label>
+                        <input name="name" id="sectionFormName" class="form-control form-control-lg" placeholder="e.g. Power, Benevolence, Excellence" required value="<?php echo $editSectionRow ? htmlspecialchars($editSectionRow['name']) : ''; ?>" autocomplete="off"/>
                       </div>
                     </div>
                     
@@ -2394,12 +2453,31 @@ if (empty($schoolId)) {
               $editGradeRow = $r->fetch_assoc();
             }
             
-            // Get all students for dropdown
+            // Get all students for dropdown / search suggestions
             $students = [];
             $studentsQuery = $conn->query("SELECT id, username, full_name FROM users WHERE role = 'student' ORDER BY full_name, username");
             if ($studentsQuery) {
               while ($row = $studentsQuery->fetch_assoc()) {
                 $students[] = $row;
+              }
+            }
+            $gradeStudentDisplay = '';
+            $gradeStudentIdValue = '';
+            if ($editGradeRow) {
+              if (!empty($editGradeRow['user_id'])) {
+                foreach ($students as $student) {
+                  if ((int)$student['id'] === (int)$editGradeRow['user_id']) {
+                    $gradeStudentDisplay = trim($student['full_name'] ?? '');
+                    if ($gradeStudentDisplay === '') {
+                      $gradeStudentDisplay = $student['username'] ?? '';
+                    }
+                    break;
+                  }
+                }
+                $gradeStudentIdValue = (string)(int)$editGradeRow['user_id'];
+              }
+              if ($gradeStudentDisplay === '' && !empty($editGradeRow['username'])) {
+                $gradeStudentDisplay = $editGradeRow['username'];
               }
             }
             
@@ -2453,25 +2531,70 @@ if (empty($schoolId)) {
                 <?php else: ?>
                   <input type="hidden" name="action" value="create" />
                 <?php endif; ?>
-                
-                <div class="mb-3">
-                  <label class="admin-form-label"><i class="bi bi-person"></i> Student</label>
-                  <select name="user_id" class="form-select form-select-lg" required>
-                    <option value="">Select Student...</option>
-                    <?php if (empty($students)): ?>
-                      <option value="" disabled>No students found. Please create student accounts first.</option>
-                    <?php else: ?>
-                      <?php foreach ($students as $student): ?>
-                        <option value="<?php echo (int)$student['id']; ?>" <?php echo ($editGradeRow && $editGradeRow['user_id'] == $student['id']) ? 'selected' : ''; ?>>
-                          <?php echo htmlspecialchars($student['full_name'] . ' (' . $student['username'] . ')'); ?>
-                        </option>
-                      <?php endforeach; ?>
-                    <?php endif; ?>
-                  </select>
-                </div>
-                
+
                 <div class="row g-3 mb-3">
-                  <div class="col-md-6">
+                  <div class="col-lg-7">
+                    <div class="admin-form-group">
+                      <label class="admin-form-label" for="gradeStudentSearchInput">
+                        <i class="bi bi-search"></i> Student Search
+                      </label>
+                      <div class="admin-search-wrapper">
+                        <input
+                          type="text"
+                          id="gradeStudentSearchInput"
+                          class="form-control form-control-lg"
+                          placeholder="Start typing a student name or username"
+                          autocomplete="off"
+                          role="combobox"
+                          aria-autocomplete="list"
+                          aria-expanded="false"
+                          aria-controls="gradeStudentSearchList"
+                          aria-haspopup="listbox"
+                          value="<?php echo htmlspecialchars($gradeStudentDisplay); ?>"
+                          required
+                        />
+                        <ul id="gradeStudentSearchList" role="listbox" class="admin-search-dropdown" aria-hidden="true"></ul>
+                      </div>
+                      <input type="hidden" name="user_id" id="gradeStudentIdHidden" value="<?php echo htmlspecialchars($gradeStudentIdValue); ?>" />
+                      <div class="admin-hint">
+                        <i class="bi bi-info-circle"></i>
+                        <span>Select a student from the suggestions to link this grade to the correct record.</span>
+                      </div>
+                      <noscript>
+                        <select name="user_id" class="form-select form-select-lg" style="margin-top: 10px;">
+                          <option value="">Select Student...</option>
+                          <?php if (empty($students)): ?>
+                            <option value="" disabled>No students found. Please create student accounts first.</option>
+                          <?php else: ?>
+                            <?php foreach ($students as $student):
+                              $studentLabel = trim($student['full_name'] ?? '');
+                              if ($studentLabel === '') {
+                                $studentLabel = $student['username'] ?? '';
+                              }
+                              $studentUsername = $student['username'] ?? '';
+                              $optionText = $studentLabel;
+                              if ($studentUsername && $studentUsername !== $studentLabel) {
+                                $optionText .= ' (' . $studentUsername . ')';
+                              }
+                            ?>
+                              <option value="<?php echo (int)$student['id']; ?>" <?php echo ($gradeStudentIdValue !== '' && (int)$student['id'] === (int)$gradeStudentIdValue) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($optionText); ?>
+                              </option>
+                            <?php endforeach; ?>
+                          <?php endif; ?>
+                        </select>
+                      </noscript>
+                    </div>
+                  </div>
+                  <div class="col-lg-5">
+                    <label class="admin-form-label"><i class="bi bi-person-badge"></i> Instructor</label>
+                    <input name="instructor" class="form-control form-control-lg" placeholder="e.g. Ms. Johnson"
+                      value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['instructor'] ?? '') : ''; ?>"/>
+                  </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4">
                     <label class="admin-form-label"><i class="bi bi-calendar-year"></i> Year</label>
                     <select name="year" class="form-select form-select-lg" required>
                       <option value="1" <?php echo ($editGradeRow && $editGradeRow['year']=='1')?'selected':'';?>>1st Year</option>
@@ -2480,48 +2603,51 @@ if (empty($schoolId)) {
                       <option value="4" <?php echo ($editGradeRow && $editGradeRow['year']=='4')?'selected':'';?>>4th Year</option>
                     </select>
                   </div>
-                  <div class="col-md-6">
+                  <div class="col-md-4">
                     <label class="admin-form-label"><i class="bi bi-calendar3"></i> Semester</label>
                     <select name="semester" class="form-select form-select-lg" required>
                       <option value="First Semester" <?php echo ($editGradeRow && $editGradeRow['semester']=='First Semester')?'selected':'';?>>First Semester</option>
                       <option value="Second Semester" <?php echo ($editGradeRow && $editGradeRow['semester']=='Second Semester')?'selected':'';?>>Second Semester</option>
                     </select>
                   </div>
+                  <div class="col-md-4">
+                    <label class="admin-form-label"><i class="bi bi-book"></i> Subject</label>
+                    <input name="subject" class="form-control form-control-lg" placeholder="e.g. Mathematics" required
+                      value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['subject']) : ''; ?>"/>
+                  </div>
                 </div>
-                
-                <div class="mb-3">
-                  <label class="admin-form-label"><i class="bi bi-book"></i> Subject</label>
-                  <input name="subject" class="form-control form-control-lg" placeholder="e.g. Mathematics" required value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['subject']) : ''; ?>"/>
-                </div>
-                
-                <div class="mb-3">
-                  <label class="admin-form-label"><i class="bi bi-person-badge"></i> Instructor</label>
-                  <input name="instructor" class="form-control form-control-lg" placeholder="e.g. Ms. Johnson" value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['instructor'] ?? '') : ''; ?>"/>
-                </div>
-                
-                <div class="row g-3 mb-3">
+
+                <div class="row g-3">
                   <div class="col-md-4">
                     <label class="admin-form-label"><i class="bi bi-1-circle"></i> Prelim</label>
-                    <input name="prelim_grade" type="number" step="0.01" min="0" max="100" class="form-control form-control-lg" placeholder="88" value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['prelim_grade'] ?? '') : ''; ?>"/>
+                    <input name="prelim_grade" type="number" step="0.01" min="0" max="100"
+                      class="form-control form-control-lg" placeholder="88"
+                      value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['prelim_grade'] ?? '') : ''; ?>"/>
                   </div>
                   <div class="col-md-4">
                     <label class="admin-form-label"><i class="bi bi-2-circle"></i> Midterm</label>
-                    <input name="midterm_grade" type="number" step="0.01" min="0" max="100" class="form-control form-control-lg" placeholder="92" value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['midterm_grade'] ?? '') : ''; ?>"/>
+                    <input name="midterm_grade" type="number" step="0.01" min="0" max="100"
+                      class="form-control form-control-lg" placeholder="92"
+                      value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['midterm_grade'] ?? '') : ''; ?>"/>
                   </div>
                   <div class="col-md-4">
                     <label class="admin-form-label"><i class="bi bi-3-circle"></i> Finals</label>
-                    <input name="finals_grade" type="number" step="0.01" min="0" max="100" class="form-control form-control-lg" placeholder="90" value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['finals_grade'] ?? '') : ''; ?>"/>
+                    <input name="finals_grade" type="number" step="0.01" min="0" max="100"
+                      class="form-control form-control-lg" placeholder="90"
+                      value="<?php echo $editGradeRow ? htmlspecialchars($editGradeRow['finals_grade'] ?? '') : ''; ?>"/>
                   </div>
                 </div>
-                
-                <button class="btn btn-primary btn-lg">
-                  <i class="bi bi-check-circle me-2"></i><?php echo $editGradeRow ? 'Update Grade' : 'Save Grade'; ?>
-                </button>
-                <?php if ($editGradeRow): ?>
-                  <a href="/TCC/public/admin_dashboard.php?section=grade_system" class="btn btn-secondary btn-lg ms-2">
-                    <i class="bi bi-x-circle me-2"></i>Cancel
-                  </a>
-                <?php endif; ?>
+
+                <div class="d-flex align-items-center gap-2 mt-4">
+                  <button class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-circle me-2"></i><?php echo $editGradeRow ? 'Update Grade' : 'Save Grade'; ?>
+                  </button>
+                  <?php if ($editGradeRow): ?>
+                    <a href="/TCC/public/admin_dashboard.php?section=grade_system" class="btn btn-secondary btn-lg">
+                      <i class="bi bi-x-circle me-2"></i>Cancel
+                    </a>
+                  <?php endif; ?>
+                </div>
               </form>
             </div>
             
@@ -2573,12 +2699,14 @@ if (empty($schoolId)) {
                   <?php endif; ?>
                 </div>
                 <div class="grade-filter-actions">
+                  <?php
+                  $filterBase = $_GET ?? [];
+                  $filterBase['section'] = 'grade_system';
+                  ?>
                   <?php if (!empty($availableYears)): ?>
                   <div class="grade-filter-group">
                     <span class="grade-filter-label">Year Level</span>
                     <?php 
-                    $filterBase = $_GET;
-                    $filterBase['section'] = 'grade_system';
                     $yearBase = $filterBase;
                     unset($yearBase['grade_year']);
                     $yearAllUrl = '/TCC/public/admin_dashboard.php?' . htmlspecialchars(http_build_query($yearBase));
@@ -2818,9 +2946,7 @@ if (empty($schoolId)) {
                         <?php if ($averageScore !== null): ?>
                           <span class="meta-pill meta-pill-accent"><?php echo htmlspecialchars($averageScore); ?><small>avg</small></span>
                         <?php endif; ?>
-                        <span class="meta-pill view-pill" data-bs-toggle="modal" data-bs-target="#gradeStudentModal" data-grade-info="<?php echo $modalJson; ?>">
-                          <i class="bi bi-card-text"></i> View
-                        </span>
+                        <!-- View removed -->
                         <?php if (!empty($allGradeIds)): ?>
                         <form action="/TCC/BackEnd/admin/manage_grades.php" method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete all grades for <?php echo htmlspecialchars($displayName); ?>? This action cannot be undone.');" class="delete-student-grades-form">
                           <?php foreach ($allGradeIds as $gradeId): ?>
@@ -2843,43 +2969,18 @@ if (empty($schoolId)) {
                       </div>
 
                     </div>
-
-            <div class="modal fade" id="gradeStudentModal" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content grade-modal-content">
-                  <div class="modal-header grade-modal-header">
-                    <div>
-                      <h5 class="modal-title grade-modal-title">Student Grades</h5>
-                      <p class="grade-modal-subtitle mb-0"></p>
-                </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-                  <div class="modal-body grade-modal-body">
-                    <div class="grade-modal-summary">
-                      <div class="grade-modal-chip grade-modal-chip--subjects">
-                        <i class="bi bi-journal-text"></i>
-                        <span class="grade-modal-subject-count">0 subjects</span>
-            </div>
-                      <div class="grade-modal-chip grade-modal-chip--average d-none">
-                        <i class="bi bi-graph-up"></i>
-                        <span class="grade-modal-average-score">Average: 0</span>
-                            </div>
-                      </div>
-                    <div class="grade-modal-sections"></div>
-                    </div>
-                  <div class="modal-footer grade-modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                      <i class="bi bi-x-circle me-1"></i>Close
-                    </button>
-                </div>
-              </div>
-            </div>
-            </div>
+            <!-- Grade view modal removed -->
               </div>
             </div>
 
             <?php // close section switch: if ($section === 'announcements') / elseif / elseif ... ?>
             <?php endif; ?>
+
+          <?php // end settings block ?>
+
+          <?php if ($section === 'settings'): ?>
+            <?php include __DIR__ . '/../BackEnd/admin/settings_section.php'; ?>
+          <?php endif; ?>
 
       </main>
     </div>
@@ -2969,6 +3070,35 @@ if (empty($schoolId)) {
       document.addEventListener('DOMContentLoaded', ()=>{
         var t=document.querySelectorAll('[data-bs-toggle="tooltip"]');Array.from(t).forEach(el=>new bootstrap.Tooltip(el));
         
+        // Hero clock updater (admin)
+        (function(){
+          function ordinal(n){var s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
+          function updateClock(prefix){
+            var timeEl=document.getElementById(prefix+'ClockTime');
+            var subEl=document.getElementById(prefix+'ClockSub');
+            var dayEl=document.getElementById(prefix+'ClockDay');
+            if(!timeEl||!subEl||!dayEl) return;
+            var d=new Date();
+            var hours24=d.getHours();
+            var minutes=d.getMinutes();
+            var seconds=d.getSeconds();
+            var ampm=hours24>=12?'PM':'AM';
+            var displayHour=hours24%12;
+            if(displayHour===0){displayHour=12;}
+            var hh=displayHour<10?'0'+displayHour:String(displayHour);
+            var mm=minutes<10?'0'+minutes:String(minutes);
+            var ss=seconds<10?'0'+seconds:String(seconds);
+            timeEl.textContent=hh+':'+mm+':'+ss;
+            subEl.textContent=ampm;
+            var weekday=d.toLocaleDateString(undefined,{weekday:'long'});
+            var month=d.toLocaleDateString(undefined,{month:'long'});
+            var day=d.getDate();
+            dayEl.textContent=weekday+', '+month+' '+ordinal(day);
+          }
+          updateClock('adm');
+          setInterval(function(){updateClock('adm');}, 1000);
+        })();
+        
         // Restore scroll position if it was saved (form was submitted)
         restoreScrollPosition();
         
@@ -3006,270 +3136,7 @@ if (empty($schoolId)) {
           });
         });
 
-        var gradeModal = document.getElementById('gradeStudentModal');
-        if (gradeModal) {
-          var modalInstance = bootstrap.Modal.getOrCreateInstance(gradeModal);
-          var modalTitleEl = gradeModal.querySelector('.grade-modal-title');
-          var modalSubtitleEl = gradeModal.querySelector('.grade-modal-subtitle');
-          var subjectCountEl = gradeModal.querySelector('.grade-modal-subject-count');
-          var averageChipEl = gradeModal.querySelector('.grade-modal-chip--average');
-          var averageScoreEl = gradeModal.querySelector('.grade-modal-average-score');
-          var sectionsEl = gradeModal.querySelector('.grade-modal-sections');
-          
-          // Force remove blur when modal opens
-          gradeModal.addEventListener('show.bs.modal', function() {
-            var backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) {
-              backdrop.style.backdropFilter = 'none';
-              backdrop.style.webkitBackdropFilter = 'none';
-              backdrop.style.filter = 'none';
-            }
-            document.body.style.backdropFilter = 'none';
-            document.body.style.webkitBackdropFilter = 'none';
-            document.body.style.filter = 'none';
-            // Remove blur from all elements
-            var allElements = document.querySelectorAll('*');
-            allElements.forEach(function(el) {
-              if (el !== gradeModal && !gradeModal.contains(el)) {
-                el.style.backdropFilter = 'none';
-                el.style.webkitBackdropFilter = 'none';
-                el.style.filter = 'none';
-              }
-            });
-          });
-          
-          // Clean up when modal closes
-          gradeModal.addEventListener('hidden.bs.modal', function() {
-            var backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) {
-              backdrop.style.backdropFilter = '';
-              backdrop.style.webkitBackdropFilter = '';
-              backdrop.style.filter = '';
-              // Force remove backdrop if it's still there
-              if (!backdrop.classList.contains('show')) {
-                backdrop.remove();
-              }
-            }
-            // Remove modal-open class from body if no other modals are open
-            var openModals = document.querySelectorAll('.modal.show');
-            if (openModals.length === 0) {
-              document.body.classList.remove('modal-open');
-              document.body.style.overflow = '';
-              document.body.style.paddingRight = '';
-            }
-          });
-
-          // Handle view-pill clicks to open modal
-          var viewPills = document.querySelectorAll('.view-pill[data-grade-info]');
-          viewPills.forEach(function(pill) {
-            pill.addEventListener('click', function(e) {
-              e.stopPropagation();
-              var gradeInfo = pill.getAttribute('data-grade-info');
-              if (gradeInfo) {
-                try {
-                  var data = JSON.parse(gradeInfo);
-                  // Set modal data
-                  gradeModal.setAttribute('data-grade-info', gradeInfo);
-                  // Open modal
-                  modalInstance.show();
-                } catch (err) {
-                  console.error('Error parsing grade info:', err);
-                }
-              }
-            });
-          });
-
-          // Force close buttons to work
-          var closeButtons = gradeModal.querySelectorAll('[data-bs-dismiss="modal"], .btn-close, .grade-modal-footer .btn');
-          closeButtons.forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-              e.stopPropagation();
-              modalInstance.hide();
-            });
-          });
-
-          function formatGradeValue(val) {
-            if (val === null || val === undefined || val === '') {
-              return '—';
-            }
-            var num = Number(val);
-            if (!Number.isNaN(num)) {
-              return num.toFixed(2);
-            }
-            return String(val);
-          }
-
-          function createHiddenInput(name, value) {
-            var input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = name;
-            input.value = value;
-            return input;
-          }
-
-          function createGradeRow(record) {
-            var row = document.createElement('tr');
-
-            var subjectCell = document.createElement('td');
-            subjectCell.className = 'grade-modal-table__subject';
-            var subjectTitle = document.createElement('div');
-            subjectTitle.className = 'grade-modal-table__subject-name';
-            subjectTitle.textContent = record.subject || 'Untitled Subject';
-            subjectCell.appendChild(subjectTitle);
-            if (record.instructor) {
-              var instructorTag = document.createElement('span');
-              instructorTag.className = 'grade-modal-table__instructor';
-              instructorTag.innerHTML = '<i class="bi bi-person-badge-fill"></i> ' + record.instructor;
-              subjectCell.appendChild(instructorTag);
-            }
-            row.appendChild(subjectCell);
-
-            var prelimCell = document.createElement('td');
-            prelimCell.textContent = formatGradeValue(record.prelim);
-            row.appendChild(prelimCell);
-
-            var midtermCell = document.createElement('td');
-            midtermCell.textContent = formatGradeValue(record.midterm);
-            row.appendChild(midtermCell);
-
-            var finalsCell = document.createElement('td');
-            finalsCell.textContent = formatGradeValue(record.finals);
-            row.appendChild(finalsCell);
-
-            var actionsCell = document.createElement('td');
-            actionsCell.className = 'grade-modal-table__actions';
-
-            if (record.id && parseInt(record.id, 10) > 0) {
-              var editLink = document.createElement('a');
-              editLink.className = 'Btn Btn-edit';
-              editLink.href = '/TCC/public/admin_dashboard.php?section=grade_system&edit_grade_id=' + encodeURIComponent(record.id);
-              editLink.innerHTML = '<div class="svgWrapper"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 42 42" class="svgIcon"><path stroke-width="5" stroke="#fff" d="M21 5L7 19L5 37L23 35L37 21L21 5Z"></path><path stroke-width="3" stroke="#fff" d="M21 5L37 21"></path><path stroke-width="3" stroke="#fff" d="M15 19L23 27"></path></svg><div class="text">Edit</div></div>';
-              actionsCell.appendChild(editLink);
-
-              var deleteForm = document.createElement('form');
-              deleteForm.method = 'post';
-              deleteForm.action = '/TCC/BackEnd/admin/manage_grades.php';
-              deleteForm.style.display = 'inline';
-              deleteForm.style.marginLeft = '8px';
-              deleteForm.appendChild(createHiddenInput('action', 'delete'));
-              deleteForm.appendChild(createHiddenInput('id', record.id));
-              var deleteBtn = document.createElement('button');
-              deleteBtn.type = 'submit';
-              deleteBtn.className = 'Btn Btn-delete';
-              deleteBtn.innerHTML = '<div class="svgWrapper"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 42 42" class="svgIcon"><path stroke-width="5" stroke="#fff" d="M9.14073 2.5H32.8593C33.3608 2.5 33.8291 2.75065 34.1073 3.16795L39.0801 10.6271C39.3539 11.0378 39.5 11.5203 39.5 12.0139V21V37C39.5 38.3807 38.3807 39.5 37 39.5H5C3.61929 39.5 2.5 38.3807 2.5 37V21V12.0139C2.5 11.5203 2.6461 11.0378 2.91987 10.6271L7.89266 3.16795C8.17086 2.75065 8.63921 2.5 9.14073 2.5Z"></path><path stroke-width="5" stroke="#fff" d="M14 18L28 18M18 14V30M24 14V30"></path></svg><div class="text">Delete</div></div>';
-              deleteForm.appendChild(deleteBtn);
-              deleteForm.addEventListener('submit', function(ev){
-                if (!confirm('Delete this grade record?')) {
-                  ev.preventDefault();
-                }
-              });
-              actionsCell.appendChild(deleteForm);
-            } else {
-              actionsCell.innerHTML = '<span class="text-muted">—</span>';
-            }
-
-            row.appendChild(actionsCell);
-            return row;
-          }
-
-          gradeModal.addEventListener('show.bs.modal', function(event){
-            var trigger = event.relatedTarget;
-            var payload = null;
-            
-            // First try to get payload from trigger (Bootstrap data-bs-toggle)
-            if (trigger) {
-              payload = trigger.getAttribute('data-grade-info');
-            }
-            
-            // If no trigger, check modal's data attribute (programmatic open)
-            if (!payload) {
-              payload = gradeModal.getAttribute('data-grade-info');
-            }
-            
-            if (!payload) return;
-            var data = null;
-            try {
-              data = JSON.parse(payload);
-            } catch (err) {
-              console.error('Unable to parse grade info payload', err);
-              return;
-            }
-            if (!data) return;
-
-            if (modalTitleEl) {
-              modalTitleEl.textContent = data.student || 'Student Grades';
-            }
-            if (modalSubtitleEl) {
-              if (data.yearLabel) {
-                modalSubtitleEl.textContent = data.yearLabel;
-                modalSubtitleEl.classList.remove('d-none');
-              } else {
-                modalSubtitleEl.textContent = '';
-                modalSubtitleEl.classList.add('d-none');
-              }
-            }
-
-            if (subjectCountEl) {
-              var subjectCount = parseInt(data.subjectCount || 0, 10);
-              subjectCountEl.textContent = subjectCount + ' ' + (subjectCount === 1 ? 'subject' : 'subjects');
-            }
-
-            if (averageChipEl && averageScoreEl) {
-              if (data.averageScore !== null && data.averageScore !== undefined && data.averageScore !== '') {
-                averageScoreEl.textContent = 'Average: ' + data.averageScore;
-                averageChipEl.classList.remove('d-none');
-              } else {
-                averageChipEl.classList.add('d-none');
-              }
-            }
-
-            if (sectionsEl) {
-              sectionsEl.innerHTML = '';
-              var semesters = Array.isArray(data.semesters) ? data.semesters : [];
-              if (semesters.length === 0) {
-                var empty = document.createElement('div');
-                empty.className = 'grade-modal-section-empty';
-                empty.textContent = 'No grade records available for this student yet.';
-                sectionsEl.appendChild(empty);
-              } else {
-                semesters.forEach(function(semester){
-                  var section = document.createElement('section');
-                  section.className = 'grade-modal-section';
-                  var heading = document.createElement('h4');
-                  heading.className = 'grade-semester-title';
-                  heading.textContent = semester.name || 'Semester';
-                  section.appendChild(heading);
-                  var subjects = Array.isArray(semester.subjects) ? semester.subjects : [];
-                  if (subjects.length === 0) {
-                    var none = document.createElement('div');
-                    none.className = 'grade-modal-section-empty';
-                    none.textContent = 'No subjects recorded for this semester.';
-                    section.appendChild(none);
-                  } else {
-                    var tableWrapper = document.createElement('div');
-                    tableWrapper.className = 'grade-modal-table-wrapper';
-                    var table = document.createElement('table');
-                    table.className = 'grade-modal-table';
-
-                    var thead = document.createElement('thead');
-                    thead.innerHTML = '<tr><th scope="col">Subject</th><th scope="col">Prelim</th><th scope="col">Midterm</th><th scope="col">Finals</th><th scope="col" class="text-end">Actions</th></tr>';
-                    table.appendChild(thead);
-
-                    var tbody = document.createElement('tbody');
-                    subjects.forEach(function(record){
-                      tbody.appendChild(createGradeRow(record));
-                    });
-                    table.appendChild(tbody);
-
-                    tableWrapper.appendChild(table);
-                    section.appendChild(tableWrapper);
-                  }
-                  sectionsEl.appendChild(section);
-                });
-              }
-            }
-          });
-        }
+        // Grade view modal removed
 
         var editModal = document.getElementById('editUserModal');
         if (editModal) {
@@ -3317,234 +3184,205 @@ if (empty($schoolId)) {
             });
           }
         }
-        // Autocomplete hookup for user search (with keyboard navigation)
+        // Autocomplete hookup for user/teacher search (with keyboard navigation)
         (function(){
-          var input = document.getElementById('userSearchInput');
-          var list = document.getElementById('userSearchList');
-          var hidden = document.getElementById('existingUserIdHidden');
-          var fullName = document.getElementById('assignFullName');
-          var debounceTimer = null;
-          var selectedIndex = -1;
+          function initAdminSearchAutocomplete(opts){
+            var input = document.getElementById(opts.inputId);
+            var list = document.getElementById(opts.listId);
+            if (!input || !list) return;
 
-          function highlightAt(idx) {
-            var items = list.querySelectorAll('.admin-search-item');
-            items.forEach(function(it, i){
-              var sel = (i===idx);
-              it.classList.toggle('active', sel);
-              it.setAttribute('aria-selected', sel ? 'true' : 'false');
-            });
-            selectedIndex = (idx >= 0 && idx < items.length) ? idx : -1;
-            // ensure visible
-            if (selectedIndex !== -1) {
-              var el = items[selectedIndex];
-              if (el && el.scrollIntoView) el.scrollIntoView({block:'nearest'});
-              // associate active descendant with input for screen readers
-              if (input) input.setAttribute('aria-activedescendant', el.id || '');
-            }
-          }
+            var hidden = opts.hiddenId ? document.getElementById(opts.hiddenId) : null;
+            var fullName = opts.fullNameId ? document.getElementById(opts.fullNameId) : null;
+            var debounceTimer = null;
+            var selectedIndex = -1;
+            var limit = typeof opts.limit === 'number' ? opts.limit : 12;
+            var suggestionPrefix = opts.suggestionPrefix || opts.inputId || 'opt';
+            var debug = !!opts.debug;
 
-          function clearList(){ 
-            list.innerHTML = ''; 
-            list.classList.remove('show');
-            list.style.display = 'none';
-          }
-
-          function chooseItem(id, name, username){
-            if (hidden) hidden.value = id ? id : '';
-            if (fullName) fullName.value = name || username || '';
-            if (input) input.value = (name || username || '');
-            clearList();
-            if (input) { input.setAttribute('aria-expanded','false'); input.removeAttribute('aria-activedescendant'); }
-            selectedIndex = -1;
-          }
-
-          if (!input) return;
-          input.addEventListener('input', function(e){
-            var q = input.value.trim();
-            if (debounceTimer) clearTimeout(debounceTimer);
-            // clear existing selection when typing
-            if (hidden) hidden.value = '';
-            debounceTimer = setTimeout(function(){
-              if (q.length < 2) { clearList(); return; }
-              fetch('/TCC/BackEnd/admin/user_search.php?q=' + encodeURIComponent(q) + '&limit=12')
-                .then(function(res){ return res.json(); })
-                .then(function(data){
-                  list.innerHTML = '';
-                  if (!data || !data.results || data.results.length === 0) { clearList(); return; }
-                  var _sugCounter = 0;
-                  data.results.forEach(function(r){
-                    var li = document.createElement('li');
-                    li.className = 'admin-search-item';
-                    li.style.cursor = 'pointer';
-                    li.innerHTML = '<strong>' + (r.full_name || r.username) + '</strong> <span class="text-muted">(' + r.username + ')</span>';
-                    li.dataset.id = r.id;
-                    li.dataset.full = r.full_name || '';
-                    li.dataset.user = r.username || '';
-                    // accessibility attributes
-                    li.id = 'useropt-' + (r.id || 'x') + '-' + (_sugCounter++);
-                    li.setAttribute('role','option');
-                    li.setAttribute('aria-selected','false');
-                    li.addEventListener('click', function(){ chooseItem(li.dataset.id, li.dataset.full, li.dataset.user); });
-                    li.addEventListener('mouseenter', function(){ highlightAt(_sugCounter - 1); });
-                    list.appendChild(li);
-                  });
-                  // mark list visible for screen readers
-                  list.setAttribute('aria-hidden','false');
-                  input.setAttribute('aria-expanded','true');
-                  // reset any keyboard selection
-                  selectedIndex = -1;
-                  list.style.display = 'block';
-                  list.classList.add('show');
-                  list.setAttribute('role','listbox');
-                  list.setAttribute('aria-hidden','false');
-                  input.setAttribute('aria-expanded','true');
-                }).catch(function(){ clearList(); });
-            }, 220);
-          });
-
-          // keyboard handling: up/down to move, enter to pick, esc to clear
-          input.addEventListener('keydown', function(ev){
-            var items = list.querySelectorAll('.admin-search-item');
-            if (ev.key === 'ArrowDown') {
-              ev.preventDefault();
-              if (items.length === 0) return;
-              var ni = selectedIndex + 1;
-              if (ni >= items.length) ni = 0;
-              highlightAt(ni);
-            } else if (ev.key === 'ArrowUp') {
-              ev.preventDefault();
-              if (items.length === 0) return;
-              var ni = selectedIndex - 1;
-              if (ni < 0) ni = items.length - 1;
-              highlightAt(ni);
-            } else if (ev.key === 'Enter') {
+            function highlightAt(idx) {
+              var items = list.querySelectorAll('.admin-search-item');
+              items.forEach(function(it, i){
+                var sel = (i===idx);
+                it.classList.toggle('active', sel);
+                it.setAttribute('aria-selected', sel ? 'true' : 'false');
+              });
+              selectedIndex = (idx >= 0 && idx < items.length) ? idx : -1;
               if (selectedIndex !== -1) {
-                ev.preventDefault();
-                var chosen = items[selectedIndex];
-                if (chosen) chooseItem(chosen.dataset.id, chosen.dataset.full, chosen.dataset.user);
+                var el = items[selectedIndex];
+                if (el && el.scrollIntoView) el.scrollIntoView({block:'nearest'});
+                if (input) input.setAttribute('aria-activedescendant', el.id || '');
               }
-            } else if (ev.key === 'Escape') {
-              clearList();
             }
+
+            function clearList(){
+              list.innerHTML = '';
+              list.classList.remove('show');
+              list.style.display = 'none';
+              list.setAttribute('aria-hidden','true');
+              input.setAttribute('aria-expanded','false');
+              input.removeAttribute('aria-activedescendant');
+            }
+
+            function chooseItem(id, name, username){
+              if (hidden) hidden.value = id ? id : '';
+              var chosenValue = name || username || '';
+              if (fullName) fullName.value = chosenValue;
+              if (input) input.value = chosenValue;
+              clearList();
+              selectedIndex = -1;
+            }
+
+            input.addEventListener('input', function(){
+              var q = input.value.trim();
+              if (debounceTimer) clearTimeout(debounceTimer);
+              if (hidden) hidden.value = '';
+              if (q.length < 2) {
+                clearList();
+                return;
+              }
+              debounceTimer = setTimeout(function(){
+                var searchParams = new URLSearchParams();
+                searchParams.set('q', q);
+                searchParams.set('limit', limit);
+                if (opts.role) searchParams.set('role', opts.role);
+                if (opts.extraParams) {
+                  Object.keys(opts.extraParams).forEach(function(key){
+                    searchParams.set(key, opts.extraParams[key]);
+                  });
+                }
+                var endpoint = '/TCC/BackEnd/admin/user_search.php?' + searchParams.toString();
+                if (debug) {
+                  console.debug('[admin-search] fetching', endpoint);
+                }
+                fetch(endpoint)
+                  .then(function(res){ return res.json(); })
+                  .then(function(data){
+                    if (debug) {
+                      console.debug('[admin-search] response', data);
+                    }
+                    list.innerHTML = '';
+                    if (!data || !Array.isArray(data.results) || data.results.length === 0) {
+                      clearList();
+                      return;
+                    }
+                    var sugCounter = 0;
+                    data.results.forEach(function(r){
+                      var li = document.createElement('li');
+                      li.className = 'admin-search-item';
+                      li.style.cursor = 'pointer';
+                      var displayName = r.full_name || r.username || '';
+                    var detailPieces = [];
+                    if (r.username) detailPieces.push('(' + r.username + ')');
+                    var metaPieces = [];
+                    if (r.role) metaPieces.push(r.role);
+                    if (r.meta) metaPieces.push(r.meta);
+                    if (metaPieces.length > 0) detailPieces.push(metaPieces.join(' · '));
+                    var detailText = detailPieces.join(' ').trim();
+                    li.innerHTML = '<strong>' + displayName + '</strong>' + (detailText ? ' <span class="text-muted">' + detailText + '</span>' : '');
+                    li.dataset.id = (r.id !== undefined && r.id !== null) ? r.id : '';
+                      li.dataset.full = displayName;
+                      li.dataset.user = r.username || '';
+                      li.id = suggestionPrefix + '-' + (r.id || 'x') + '-' + (sugCounter++);
+                      li.setAttribute('role','option');
+                      li.setAttribute('aria-selected','false');
+                      li.addEventListener('click', function(){ chooseItem(li.dataset.id, li.dataset.full, li.dataset.user); });
+                      li.addEventListener('mouseenter', function(){ highlightAt(parseInt(li.getAttribute('data-index'), 10)); });
+                      li.setAttribute('data-index', sugCounter - 1);
+                      list.appendChild(li);
+                    });
+                    list.setAttribute('role','listbox');
+                    list.setAttribute('aria-hidden','false');
+                    list.style.display = 'block';
+                    list.classList.add('show');
+                    input.setAttribute('aria-expanded','true');
+                    selectedIndex = -1;
+                  })
+                  .catch(function(){
+                    if (debug) {
+                      console.error('[admin-search] fetch failed', endpoint);
+                    }
+                    clearList();
+                  });
+              }, 220);
+            });
+
+            input.addEventListener('keydown', function(ev){
+              var items = list.querySelectorAll('.admin-search-item');
+              if (ev.key === 'ArrowDown') {
+                if (items.length === 0) return;
+                ev.preventDefault();
+                var ni = selectedIndex + 1;
+                if (ni >= items.length) ni = 0;
+                highlightAt(ni);
+              } else if (ev.key === 'ArrowUp') {
+                if (items.length === 0) return;
+                ev.preventDefault();
+                var ni = selectedIndex - 1;
+                if (ni < 0) ni = items.length - 1;
+                highlightAt(ni);
+              } else if (ev.key === 'Enter') {
+                if (selectedIndex !== -1) {
+                  ev.preventDefault();
+                  var chosen = items[selectedIndex];
+                  if (chosen) chooseItem(chosen.dataset.id, chosen.dataset.full, chosen.dataset.user);
+                }
+              } else if (ev.key === 'Escape') {
+                clearList();
+              }
+            });
+
+            document.addEventListener('click', function(ev){
+              if (!input.contains(ev.target) && !list.contains(ev.target)) {
+                clearList();
+              }
+            });
+          }
+
+          initAdminSearchAutocomplete({
+            inputId: 'userSearchInput',
+            listId: 'userSearchList',
+            hiddenId: 'existingUserIdHidden',
+            fullNameId: 'assignFullName',
+            suggestionPrefix: 'useropt'
           });
 
-          document.addEventListener('click', function(ev){ if (!input.contains(ev.target) && !list.contains(ev.target)) clearList(); });
+          initAdminSearchAutocomplete({
+            inputId: 'teacherSearchInput',
+            listId: 'teacherSearchList',
+            hiddenId: 'teacherUserIdHidden',
+            fullNameId: 'teacherFullName',
+            role: 'teacher',
+            suggestionPrefix: 'teacheropt',
+            debug: true
+          });
+
+          initAdminSearchAutocomplete({
+            inputId: 'gradeStudentSearchInput',
+            listId: 'gradeStudentSearchList',
+            hiddenId: 'gradeStudentIdHidden',
+            role: 'student',
+            suggestionPrefix: 'gradeopt'
+          });
+
+          var gradeForm = document.querySelector('form[action="/TCC/BackEnd/admin/manage_grades.php"]');
+          if (gradeForm) {
+            gradeForm.addEventListener('submit', function(ev){
+              var hiddenField = document.getElementById('gradeStudentIdHidden');
+              var textField = document.getElementById('gradeStudentSearchInput');
+              var userIdValue = hiddenField ? parseInt(hiddenField.value, 10) : 0;
+              if (!userIdValue) {
+                if (textField) {
+                  textField.focus();
+                }
+                ev.preventDefault();
+                alert('Please select a student from the suggestions before saving the grade.');
+              }
+            });
+          }
         })();
         
-        // Autocomplete hookup for teacher search (with keyboard navigation)
-        (function(){
-          var input = document.getElementById('teacherSearchInput');
-          var list = document.getElementById('teacherSearchList');
-          var hidden = document.getElementById('teacherUserIdHidden');
-          var fullName = document.getElementById('teacherFullName');
-          var debounceTimer = null;
-          var selectedIndex = -1;
-
-          function highlightAt(idx) {
-            var items = list.querySelectorAll('.admin-search-item');
-            items.forEach(function(it, i){
-              var sel = (i===idx);
-              it.classList.toggle('active', sel);
-              it.setAttribute('aria-selected', sel ? 'true' : 'false');
-            });
-            selectedIndex = (idx >= 0 && idx < items.length) ? idx : -1;
-            // ensure visible
-            if (selectedIndex !== -1) {
-              var el = items[selectedIndex];
-              if (el && el.scrollIntoView) el.scrollIntoView({block:'nearest'});
-              // associate active descendant with input for screen readers
-              if (input) input.setAttribute('aria-activedescendant', el.id || '');
-            }
-          }
-
-          function clearList(){ 
-            list.innerHTML = ''; 
-            list.classList.remove('show');
-            list.style.display = 'none';
-          }
-
-          function chooseItem(id, name, username){
-            if (hidden) hidden.value = id ? id : '';
-            if (fullName) fullName.value = name || username || '';
-            if (input) input.value = (name || username || '');
-            clearList();
-            if (input) { input.setAttribute('aria-expanded','false'); input.removeAttribute('aria-activedescendant'); }
-            selectedIndex = -1;
-          }
-
-          if (!input) return;
-          input.addEventListener('input', function(e){
-            var q = input.value.trim();
-            if (debounceTimer) clearTimeout(debounceTimer);
-            // clear existing selection when typing
-            if (hidden) hidden.value = '';
-            debounceTimer = setTimeout(function(){
-              if (q.length < 2) { clearList(); return; }
-              fetch('/TCC/BackEnd/admin/user_search.php?q=' + encodeURIComponent(q) + '&limit=12&role=teacher')
-                .then(function(res){ return res.json(); })
-                .then(function(data){
-                  list.innerHTML = '';
-                  if (!data || !data.results || data.results.length === 0) { clearList(); return; }
-                  var _sugCounter = 0;
-                  data.results.forEach(function(r){
-                    var li = document.createElement('li');
-                    li.className = 'admin-search-item';
-                    li.style.cursor = 'pointer';
-                    li.innerHTML = '<strong>' + (r.full_name || r.username) + '</strong> <span class="text-muted">(' + r.username + ')</span>';
-                    li.dataset.id = r.id;
-                    li.dataset.full = r.full_name || '';
-                    li.dataset.user = r.username || '';
-                    // accessibility attributes
-                    li.id = 'teacheropt-' + (r.id || 'x') + '-' + (_sugCounter++);
-                    li.setAttribute('role','option');
-                    li.setAttribute('aria-selected','false');
-                    li.addEventListener('click', function(){ chooseItem(li.dataset.id, li.dataset.full, li.dataset.user); });
-                    li.addEventListener('mouseenter', function(){ highlightAt(_sugCounter - 1); });
-                    list.appendChild(li);
-                  });
-                  // mark list visible for screen readers
-                  list.setAttribute('aria-hidden','false');
-                  input.setAttribute('aria-expanded','true');
-                  // reset any keyboard selection
-                  selectedIndex = -1;
-                  list.style.display = 'block';
-                  list.classList.add('show');
-                  list.setAttribute('role','listbox');
-                  list.setAttribute('aria-hidden','false');
-                  input.setAttribute('aria-expanded','true');
-                }).catch(function(){ clearList(); });
-            }, 220);
-          });
-
-          // keyboard handling: up/down to move, enter to pick, esc to clear
-          input.addEventListener('keydown', function(ev){
-            var items = list.querySelectorAll('.admin-search-item');
-            if (ev.key === 'ArrowDown') {
-              ev.preventDefault();
-              if (items.length === 0) return;
-              var ni = selectedIndex + 1;
-              if (ni >= items.length) ni = 0;
-              highlightAt(ni);
-            } else if (ev.key === 'ArrowUp') {
-              ev.preventDefault();
-              if (items.length === 0) return;
-              var ni = selectedIndex - 1;
-              if (ni < 0) ni = items.length - 1;
-              highlightAt(ni);
-            } else if (ev.key === 'Enter') {
-              if (selectedIndex !== -1) {
-                ev.preventDefault();
-                var chosen = items[selectedIndex];
-                if (chosen) chooseItem(chosen.dataset.id, chosen.dataset.full, chosen.dataset.user);
-              }
-            } else if (ev.key === 'Escape') {
-              clearList();
-            }
-          });
-
-          document.addEventListener('click', function(ev){ if (!input.contains(ev.target) && !list.contains(ev.target)) clearList(); });
-        })();
       });
     </script>
   </body>
 </html>
+

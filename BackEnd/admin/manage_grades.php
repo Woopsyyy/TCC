@@ -1,16 +1,26 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') { 
-  header('HTTP/1.1 403 Forbidden'); 
-  exit('Forbidden'); 
-}
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { 
-  header('Location: /TCC/public/admin_dashboard.php?section=grade_system'); 
-  exit(); 
-}
+require_once __DIR__ . '/../helpers/admin_helpers.php';
+require_admin_post('/TCC/public/admin_dashboard.php?section=grade_system');
 
 require_once __DIR__ . '/../database/db.php';
 $conn = Database::getInstance()->getConnection();
+
+ensure_tables($conn, [
+  'student_grades' => "CREATE TABLE IF NOT EXISTS student_grades (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT DEFAULT NULL,
+    username VARCHAR(255) NOT NULL,
+    year VARCHAR(20) NOT NULL,
+    semester VARCHAR(20) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    instructor VARCHAR(255) DEFAULT NULL,
+    prelim_grade DECIMAL(5,2) DEFAULT NULL,
+    midterm_grade DECIMAL(5,2) DEFAULT NULL,
+    finals_grade DECIMAL(5,2) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+]);
 
 $action = $_POST['action'] ?? 'create';
 
@@ -36,16 +46,8 @@ if ($action === 'delete') {
   $stmt->execute();
   $stmt->close();
   
-  // Audit log
-  $a = $_SESSION['username'] ?? null;
-  $act = 'delete';
-  $t = 'student_grades';
-  $id_s = (string)$id;
   $details = "deleted grade for " . ($gradeInfo['username'] ?? 'unknown') . " (subject: " . ($gradeInfo['subject'] ?? '') . ", year: " . ($gradeInfo['year'] ?? '') . ", semester: " . ($gradeInfo['semester'] ?? '') . ")";
-  $l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-  $l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-  $l->execute();
-  $l->close();
+  log_audit($conn, 'delete', 'student_grades', $id, $details);
   
   header('Location: /TCC/public/admin_dashboard.php?section=grade_system&success=deleted'); 
   exit();
@@ -91,16 +93,8 @@ if ($action === 'delete') {
   $deletedCount = $stmt->affected_rows;
   $stmt->close();
   
-  // Audit log
-  $a = $_SESSION['username'] ?? null;
-  $act = 'delete';
-  $t = 'student_grades';
-  $id_s = implode(',', $validIds);
-  $details = "deleted all grades ($deletedCount records) for " . htmlspecialchars($studentName);
-  $l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-  $l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-  $l->execute();
-  $l->close();
+  $details = "deleted all grades (" . $deletedCount . " records) for " . htmlspecialchars($studentName);
+  log_audit($conn, 'delete', 'student_grades', implode(',', $validIds), $details);
   
   header('Location: /TCC/public/admin_dashboard.php?section=grade_system&success=deleted_all'); 
   exit();
@@ -146,16 +140,8 @@ if ($action === 'delete') {
   $stmt->execute();
   $stmt->close();
   
-  // Audit log
-  $a = $_SESSION['username'] ?? null;
-  $act = 'update';
-  $t = 'student_grades';
-  $id_s = (string)$id;
   $details = "updated grade for " . $username . " (subject: " . $subject . ", year: " . $year . ", semester: " . $semester . ")";
-  $l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-  $l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-  $l->execute();
-  $l->close();
+  log_audit($conn, 'update', 'student_grades', $id, $details);
   
   header('Location: /TCC/public/admin_dashboard.php?section=grade_system&success=updated'); 
   exit();
@@ -196,16 +182,8 @@ if ($action === 'delete') {
   $newId = $conn->insert_id;
   $stmt->close();
   
-  // Audit log
-  $a = $_SESSION['username'] ?? null;
-  $act = 'create';
-  $t = 'student_grades';
-  $id_s = (string)$newId;
   $details = "created grade for " . $username . " (subject: " . $subject . ", year: " . $year . ", semester: " . $semester . ")";
-  $l = $conn->prepare("INSERT INTO audit_log (admin_user, action, target_table, target_id, details) VALUES (?,?,?,?,?)");
-  $l->bind_param('sssss', $a, $act, $t, $id_s, $details);
-  $l->execute();
-  $l->close();
+  log_audit($conn, 'create', 'student_grades', $newId, $details);
   
   header('Location: /TCC/public/admin_dashboard.php?section=grade_system&success=created'); 
   exit();
