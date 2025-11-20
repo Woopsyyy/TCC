@@ -50,7 +50,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
 
                 error_log("Session variables set. Role: " . $user['role']);
-                header("Location: /TCC/public/home.php");
+                $userRole = $user['role'] ?? 'student';
+                if ($userRole === 'admin') {
+                  header("Location: /TCC/public/admin_dashboard.php");
+                } elseif ($userRole === 'teacher') {
+                  header("Location: /TCC/public/teachers.php");
+                } else {
+                  header("Location: /TCC/public/home.php");
+                }
                 exit();
             } else {
                 error_log("Password verification failed for user: " . $username);

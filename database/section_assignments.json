@@ -38,5 +38,13 @@
         "building": "C",
         "floor": 2,
         "room": "301"
+    },
+    "3|Quartz": {
+        "id": 5,
+        "year": "3",
+        "section": "Quartz",
+        "building": "ANNEX",
+        "floor": 1,
+        "room": "102"
     }
 }

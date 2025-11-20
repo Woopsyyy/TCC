@@ -20,6 +20,14 @@ $adminName = $_SESSION['full_name'] ?? $_SESSION['username'];
 $schoolId = $_SESSION['school_id'] ?? '';
 $userRole = $_SESSION['role'] ?? 'admin';
 $section = isset($_GET['section']) ? $_GET['section'] : 'announcements';
+$courseMajorMap = [
+  'IT' => ['Computer Technology', 'Electronics'],
+  'BSED' => ['English', 'Physical Education', 'Math', 'Filipino', 'Social Science'],
+  'HM' => ['General'],
+  'BEED' => ['General'],
+  'TOURISM' => ['General']
+];
+$semesterOptions = ['First Semester', 'Second Semester'];
 
 // Redirect old user_management URLs to manage_students (preserve query parameters)
 if ($section === 'user_management') {
@@ -122,13 +130,19 @@ if (empty($schoolId)) {
                     </div>
                     <div class="col-md-6">
                       <label class="admin-form-label" for="modalDepartment"><i class="bi bi-building"></i> Department</label>
-                      <select name="department" id="modalDepartment" class="form-select form-select-lg">
+                      <select name="department" id="modalDepartment" class="form-select form-select-lg" data-course-select>
                         <option value="">(none)</option>
                         <option value="IT">IT</option>
                         <option value="HM">HM</option>
-                        <option value="BSEED">BSEED</option>
+                        <option value="BSED">BSED</option>
                         <option value="BEED">BEED</option>
                         <option value="TOURISM">TOURISM</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="admin-form-label" for="modalMajor"><i class="bi bi-diagram-3"></i> Major</label>
+                      <select name="major" id="modalMajor" class="form-select form-select-lg" data-major-select>
+                        <option value="">(none)</option>
                       </select>
                     </div>
                   </div>
@@ -175,7 +189,11 @@ if (empty($schoolId)) {
             <li><a href="/TCC/public/admin_dashboard.php?section=buildings" class="nav-link <?php echo ($section==='buildings')?'active':''?>" data-bs-toggle="tooltip" title="Buildings"><i class="bi bi-building"></i><span class="nav-label">Buildings</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=projects" class="nav-link <?php echo ($section==='projects')?'active':''?>" data-bs-toggle="tooltip" title="Projects"><i class="bi bi-folder-fill"></i><span class="nav-label">Projects</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=manage_students" class="nav-link <?php echo ($section==='manage_students')?'active':''?>" data-bs-toggle="tooltip" title="Manage Students"><i class="bi bi-people-fill"></i><span class="nav-label">Manage Students</span></a></li>
+            <li><a href="/TCC/public/admin_dashboard.php?section=manage_user" class="nav-link <?php echo ($section==='manage_user')?'active':''?>" data-bs-toggle="tooltip" title="Manage User"><i class="bi bi-person-gear"></i><span class="nav-label">Manage User</span></a></li>
+            <li><a href="/TCC/public/admin_dashboard.php?section=teacher_management" class="nav-link <?php echo ($section==='teacher_management')?'active':''?>" data-bs-toggle="tooltip" title="Teacher Management"><i class="bi bi-person-badge"></i><span class="nav-label">Teacher Management</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=sections" class="nav-link <?php echo ($section==='sections')?'active':''?>" data-bs-toggle="tooltip" title="Sections"><i class="bi bi-collection-fill"></i><span class="nav-label">Sections</span></a></li>
+            <li><a href="/TCC/public/admin_dashboard.php?section=subjects" class="nav-link <?php echo ($section==='subjects')?'active':''?>" data-bs-toggle="tooltip" title="Subject Catalog"><i class="bi bi-journal-text"></i><span class="nav-label">Subjects</span></a></li>
+            <li><a href="/TCC/public/admin_dashboard.php?section=study_load" class="nav-link <?php echo ($section==='study_load')?'active':''?>" data-bs-toggle="tooltip" title="Customize Study Load"><i class="bi bi-journal-check"></i><span class="nav-label">Customize Study Load</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=grade_system" class="nav-link <?php echo ($section==='grade_system')?'active':''?>" data-bs-toggle="tooltip" title="Grade System"><i class="bi bi-journal-bookmark-fill"></i><span class="nav-label">Grade System</span></a></li>
             <li><a href="/TCC/public/admin_dashboard.php?section=settings" class="nav-link <?php echo ($section==='settings')?'active':''?>" data-bs-toggle="tooltip" title="Settings"><i class="bi bi-gear-fill"></i><span class="nav-label">Settings</span></a></li>
           </ul>
@@ -208,9 +226,25 @@ if (empty($schoolId)) {
             'title' => 'Manage Students',
             'copy' => 'Handle student assignments, monitor financial standing, and manage sanctions.'
           ],
+          'manage_user' => [
+            'title' => 'Manage User Roles',
+            'copy' => 'Set user roles (Student, Admin, or Teacher) for all users in the system.'
+          ],
+          'teacher_management' => [
+            'title' => 'Teacher Management',
+            'copy' => 'View and manage teacher schedules, class assignments, and teaching loads.'
+          ],
           'sections' => [
             'title' => 'Sections',
             'copy' => 'Create and manage academic sections for each year level. Organize students into groups like Power, Benevolence, and more.'
+          ],
+          'subjects' => [
+            'title' => 'Subject Catalog',
+            'copy' => 'Centralize every subject code, title, and unit requirement to eliminate typos during enrollment.'
+          ],
+          'study_load' => [
+            'title' => 'Customize Study Load',
+            'copy' => 'Assign subjects per year and section, manage units, and keep faculty loads aligned with the curriculum.'
           ],
           'grade_system' => [
             'title' => 'Grade System',
@@ -248,9 +282,25 @@ if (empty($schoolId)) {
                 <i class="bi bi-people-fill"></i>
                 <span>Students</span>
               </a>
+              <a class="hero-action <?php echo ($section === 'manage_user') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=manage_user">
+                <i class="bi bi-person-gear"></i>
+                <span>User Roles</span>
+              </a>
+              <a class="hero-action <?php echo ($section === 'teacher_management') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=teacher_management">
+                <i class="bi bi-person-badge"></i>
+                <span>Teachers</span>
+              </a>
               <a class="hero-action <?php echo ($section === 'sections') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=sections">
                 <i class="bi bi-collection-fill"></i>
                 <span>Sections</span>
+              </a>
+              <a class="hero-action <?php echo ($section === 'subjects') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=subjects">
+                <i class="bi bi-journal-text"></i>
+                <span>Subjects</span>
+              </a>
+              <a class="hero-action <?php echo ($section === 'study_load') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=study_load">
+                <i class="bi bi-journal-check"></i>
+                <span>Study Load</span>
               </a>
               <a class="hero-action <?php echo ($section === 'grade_system') ? 'active' : ''; ?>" href="/TCC/public/admin_dashboard.php?section=grade_system">
                 <i class="bi bi-journal-bookmark-fill"></i>
@@ -281,10 +331,26 @@ if (empty($schoolId)) {
             // announcement edit support and pagination
             require_once __DIR__ . '/../BackEnd/database/db.php';
             $conn = Database::getInstance()->getConnection();
+            $announcementHasMajor = false;
+            try {
+              $colCheck = $conn->query("SHOW COLUMNS FROM announcements LIKE 'major'");
+              if ($colCheck && $colCheck->num_rows > 0) {
+                $announcementHasMajor = true;
+              } else {
+                $conn->query("ALTER TABLE announcements ADD COLUMN major VARCHAR(50) DEFAULT NULL AFTER department");
+                $announcementHasMajor = true;
+              }
+              if ($colCheck) { $colCheck->close(); }
+            } catch (Throwable $colErr) {
+              $announcementHasMajor = false;
+            }
+            $announcementSelectColumns = $announcementHasMajor
+              ? "id, title, content, year, department, major, date"
+              : "id, title, content, year, department, date";
             $editId = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
             $editRow = null;
             if ($editId > 0) {
-              $s = $conn->prepare("SELECT id, title, content, year, department FROM announcements WHERE id = ? LIMIT 1");
+              $s = $conn->prepare("SELECT id, title, content, year, department" . ($announcementHasMajor ? ", major" : "") . " FROM announcements WHERE id = ? LIMIT 1");
               $s->bind_param('i', $editId);
               $s->execute();
               $r = $s->get_result();
@@ -303,7 +369,7 @@ if (empty($schoolId)) {
               $countRes = $conn->query("SELECT COUNT(*) as c FROM announcements");
               if ($countRes) { $cntRow = $countRes->fetch_assoc(); $annTotal = intval($cntRow['c']); }
               $annTotalPages = max(1, intval(ceil($annTotal / $annPerPage)));
-              $stmt = $conn->prepare("SELECT id, title, content, year, department, date FROM announcements ORDER BY date DESC LIMIT ? OFFSET ?");
+              $stmt = $conn->prepare("SELECT $announcementSelectColumns FROM announcements ORDER BY date DESC LIMIT ? OFFSET ?");
               if ($stmt) {
                 $stmt->bind_param('ii', $annPerPage, $annOffset);
                 $stmt->execute();
@@ -340,7 +406,8 @@ if (empty($schoolId)) {
                   <div class="mb-2"><label class="form-label" for="announcementContent">Content</label><textarea name="content" id="announcementContent" class="form-control" rows="3" required><?php echo $editRow ? htmlspecialchars($editRow['content']) : ''; ?></textarea></div>
                   <div class="row g-2 mb-2">
                       <div class="col"><label class="form-label" for="announcementYear">Year</label><select name="year" id="announcementYear" class="form-select"><option value="">All</option><option value="1" <?php echo ($editRow && $editRow['year']=='1')?'selected':'';?>>1</option><option value="2" <?php echo ($editRow && $editRow['year']=='2')?'selected':'';?>>2</option><option value="3" <?php echo ($editRow && $editRow['year']=='3')?'selected':'';?>>3</option><option value="4" <?php echo ($editRow && $editRow['year']=='4')?'selected':'';?>>4</option></select></div>
-                      <div class="col"><label class="form-label" for="announcementDepartment">Department</label><select name="department" id="announcementDepartment" class="form-select"><option value="">All</option><option value="IT" <?php echo ($editRow && $editRow['department']=='IT')?'selected':'';?>>IT</option><option value="HM" <?php echo ($editRow && $editRow['department']=='HM')?'selected':'';?>>HM</option><option value="BSEED" <?php echo ($editRow && $editRow['department']=='BSEED')?'selected':'';?>>BSEED</option><option value="BEED" <?php echo ($editRow && $editRow['department']=='BEED')?'selected':'';?>>BEED</option><option value="TOURISM" <?php echo ($editRow && $editRow['department']=='TOURISM')?'selected':'';?>>TOURISM</option></select></div>
+                      <div class="col"><label class="form-label" for="announcementDepartment">Department</label><select name="department" id="announcementDepartment" class="form-select" data-course-select><option value="">All</option><option value="IT" <?php echo ($editRow && $editRow['department']=='IT')?'selected':'';?>>IT</option><option value="HM" <?php echo ($editRow && $editRow['department']=='HM')?'selected':'';?>>HM</option><option value="BSED" <?php echo ($editRow && $editRow['department']=='BSED')?'selected':'';?>>BSED</option><option value="BEED" <?php echo ($editRow && $editRow['department']=='BEED')?'selected':'';?>>BEED</option><option value="TOURISM" <?php echo ($editRow && $editRow['department']=='TOURISM')?'selected':'';?>>TOURISM</option></select></div>
+                      <div class="col"><label class="form-label" for="announcementMajor">Major</label><select name="major" id="announcementMajor" class="form-select" data-major-select data-selected="<?php echo $editRow ? htmlspecialchars($editRow['major'] ?? '') : ''; ?>"><option value="">(none)</option></select></div>
                   </div>
                   <button class="btn btn-primary"><?php echo $editRow ? 'Update Announcement' : 'Save Announcement'; ?></button>
                   <?php if ($editRow): ?><a href="/TCC/public/admin_dashboard.php?section=announcements" class="btn btn-secondary ms-2">Cancel</a><?php endif; ?>
@@ -357,7 +424,9 @@ if (empty($schoolId)) {
                   </div>
                 <?php else: ?>
                   <div class="announcements-grid mt-3">
-                  <?php foreach ($annList as $a): ?>
+                  <?php foreach ($annList as $a):
+                    $announcementMajor = $a['major'] ?? '';
+                  ?>
                       <div class="announcement-card-modern">
                         <div class="announcement-card-header">
                           <div class="announcement-title-section">
@@ -387,6 +456,12 @@ if (empty($schoolId)) {
                             <span class="announcement-badge">
                               <i class="bi bi-building"></i>
                               <?php echo htmlspecialchars($a['department']); ?>
+                            </span>
+                          <?php endif; ?>
+                          <?php if (!empty($announcementMajor)): ?>
+                            <span class="announcement-badge">
+                              <i class="bi bi-diagram-3"></i>
+                              <?php echo htmlspecialchars($announcementMajor); ?>
                             </span>
                           <?php endif; ?>
                         <?php if (!empty($a['id'])): ?>
@@ -1066,6 +1141,10 @@ if (empty($schoolId)) {
             $filterYear = isset($_GET['year_filter']) ? trim($_GET['year_filter']) : '';
             $filterSection = isset($_GET['section_filter']) ? trim($_GET['section_filter']) : '';
             $filterDept = isset($_GET['dept_filter']) ? trim($_GET['dept_filter']) : '';
+            $filterMajor = isset($_GET['major_filter']) ? trim($_GET['major_filter']) : '';
+            if ($filterDept === '' || !isset($courseMajorMap[$filterDept])) {
+              $filterMajor = '';
+            }
             $filterLacking = isset($_GET['lacking_payment']) ? true : false;
             $filterSanctions = isset($_GET['has_sanctions']) ? true : false;
             
@@ -1100,8 +1179,12 @@ if (empty($schoolId)) {
             $deptQuery = $conn->query("SELECT DISTINCT department FROM user_assignments WHERE department IS NOT NULL AND department <> '' ORDER BY department");
             if ($deptQuery) {
               while ($row = $deptQuery->fetch_assoc()) {
-                if (!empty($row['department']) && !in_array($row['department'], $availableFilterDepartments)) {
-                  $availableFilterDepartments[] = $row['department'];
+                if (!empty($row['department'])) {
+                  $deptValue = $row['department'];
+                  if ($deptValue === 'BSEED') { $deptValue = 'BSED'; }
+                  if (!in_array($deptValue, $availableFilterDepartments)) {
+                    $availableFilterDepartments[] = $deptValue;
+                  }
                 }
               }
             }
@@ -1124,7 +1207,18 @@ if (empty($schoolId)) {
             }
             if ($filterYear !== '') { $conds[] = 'ua.year = ?'; $types .= 's'; $values[] = $filterYear; }
             if ($filterSection !== '') { $conds[] = 'ua.section = ?'; $types .= 's'; $values[] = $filterSection; }
-            if ($filterDept !== '') { $conds[] = 'ua.department = ?'; $types .= 's'; $values[] = $filterDept; }
+            if ($filterDept !== '') {
+              if ($filterDept === 'BSED') {
+                $conds[] = "(ua.department = ? OR ua.department = 'BSEED')";
+                $types .= 's';
+                $values[] = $filterDept;
+              } else {
+                $conds[] = 'ua.department = ?';
+                $types .= 's';
+                $values[] = $filterDept;
+              }
+            }
+            if ($filterMajor !== '') { $conds[] = 'ua.major = ?'; $types .= 's'; $values[] = $filterMajor; }
             if ($filterLacking) { $conds[] = 'ua.payment = ?'; $types .= 's'; $values[] = 'owing'; }
             if ($filterSanctions) { $conds[] = "TRIM(COALESCE(ua.sanctions,'')) <> ''"; }
 
@@ -1146,7 +1240,7 @@ if (empty($schoolId)) {
 
             // fetch page rows with role information
             $ua = [];
-            $selSql = "SELECT ua.id, ua.username, ua.year, ua.section, ua.department, ua.payment, ua.sanctions, ua.owing_amount, ua.user_id, COALESCE(u.role, 'student') as role FROM user_assignments ua LEFT JOIN users u ON ua.user_id = u.id $where ORDER BY ua.year, ua.username LIMIT ? OFFSET ?";
+            $selSql = "SELECT ua.id, ua.username, ua.year, ua.section, ua.department, ua.major, ua.payment, ua.sanctions, ua.owing_amount, ua.user_id, COALESCE(u.role, 'student') as role FROM user_assignments ua LEFT JOIN users u ON ua.user_id = u.id $where ORDER BY ua.year, ua.username LIMIT ? OFFSET ?";
             $selStmt = $conn->prepare($selSql);
             if ($selStmt) {
               if ($types !== '') {
@@ -1252,13 +1346,23 @@ if (empty($schoolId)) {
                       <label class="admin-form-label" for="assignDepartment">
                         <i class="bi bi-building"></i> Department
                       </label>
-                      <select name="department" id="assignDepartment" class="form-select form-select-lg">
+                      <select name="department" id="assignDepartment" class="form-select form-select-lg" data-course-select>
                         <option value="">(none)</option>
                         <option value="IT">IT</option>
                         <option value="HM">HM</option>
-                        <option value="BSEED">BSEED</option>
+                        <option value="BSED">BSED</option>
                         <option value="BEED">BEED</option>
                         <option value="TOURISM">TOURISM</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="admin-form-group">
+                      <label class="admin-form-label" for="assignMajor">
+                        <i class="bi bi-diagram-3"></i> Major
+                      </label>
+                      <select name="major" id="assignMajor" class="form-select form-select-lg" data-major-select>
+                        <option value="">(none)</option>
                       </select>
                     </div>
                   </div>
@@ -1281,7 +1385,7 @@ if (empty($schoolId)) {
                       <p>Focus the overview by year, section, department, or status.</p>
                     </div>
                   </div>
-                  <?php if ($filterYear !== '' || $filterSection !== '' || $filterDept !== '' || $filterLacking || $filterSanctions || $q !== ''): ?>
+                  <?php if ($filterYear !== '' || $filterSection !== '' || $filterDept !== '' || $filterMajor !== '' || $filterLacking || $filterSanctions || $q !== ''): ?>
                     <a href="/TCC/public/admin_dashboard.php?section=manage_students" class="grade-filter-reset">
                       <i class="bi bi-arrow-counterclockwise"></i> Reset view
                     </a>
@@ -1294,6 +1398,7 @@ if (empty($schoolId)) {
                   <input type="hidden" name="year_filter" value="<?php echo htmlspecialchars($filterYear); ?>" />
                   <input type="hidden" name="section_filter" value="<?php echo htmlspecialchars($filterSection); ?>" />
                   <input type="hidden" name="dept_filter" value="<?php echo htmlspecialchars($filterDept); ?>" />
+                  <input type="hidden" name="major_filter" value="<?php echo htmlspecialchars($filterMajor); ?>" />
                   <input type="hidden" name="lacking_payment" value="<?php echo $filterLacking ? '1' : ''; ?>" />
                   <input type="hidden" name="has_sanctions" value="<?php echo $filterSanctions ? '1' : ''; ?>" />
                   <div class="input-group input-group-lg">
@@ -1301,7 +1406,7 @@ if (empty($schoolId)) {
                     <span class="input-group-text" style="background: rgba(107, 95, 79, 0.12); border: 1px solid rgba(107, 95, 79, 0.3);">
                       <i class="bi bi-search"></i>
                     </span>
-                    <input type="search" name="q" id="userSearchQuery" class="form-control" placeholder="Search by full name, section, or department..." value="<?php echo htmlspecialchars($q); ?>" style="border: 1px solid rgba(107, 95, 79, 0.3);" autocomplete="off" />
+                    <input type="search" name="q" id="userSearchQuery" class="form-control" placeholder="Search by full name, section, department, or major..." value="<?php echo htmlspecialchars($q); ?>" style="border: 1px solid rgba(107, 95, 79, 0.3);" autocomplete="off" />
                     <?php if ($q !== ''): ?>
                       <button type="submit" class="btn btn-primary">
                         <i class="bi bi-funnel-fill"></i> Search
@@ -1389,6 +1494,33 @@ if (empty($schoolId)) {
                   </div>
                   <?php endif; ?>
                   
+                  <?php
+                  $majorOptionsForDept = ($filterDept !== '' && isset($courseMajorMap[$filterDept])) ? $courseMajorMap[$filterDept] : [];
+                  if (!empty($majorOptionsForDept)):
+                    $majorBase = $filterBase;
+                    $majorBase['dept_filter'] = $filterDept;
+                    unset($majorBase['major_filter']);
+                    $majorAllUrl = '/TCC/public/admin_dashboard.php?' . htmlspecialchars(http_build_query($majorBase));
+                  ?>
+                  <div class="grade-filter-group">
+                    <span class="grade-filter-label">Major</span>
+                    <a href="<?php echo $majorAllUrl; ?>" class="grade-chip <?php echo ($filterMajor === '') ? 'active' : ''; ?>">
+                      <i class="bi bi-diagram-3"></i>
+                      <span>All Majors</span>
+                    </a>
+                    <?php foreach ($majorOptionsForDept as $majorValue): 
+                      $majorParams = $majorBase;
+                      $majorParams['major_filter'] = $majorValue;
+                      $majorUrl = '/TCC/public/admin_dashboard.php?' . htmlspecialchars(http_build_query($majorParams));
+                      ?>
+                      <a href="<?php echo $majorUrl; ?>" class="grade-chip <?php echo ($filterMajor === $majorValue) ? 'active' : ''; ?>">
+                        <i class="bi bi-bookmark-check"></i>
+                        <span><?php echo htmlspecialchars($majorValue); ?></span>
+                      </a>
+                    <?php endforeach; ?>
+                  </div>
+                  <?php endif; ?>
+                  
                   <div class="grade-filter-group">
                     <span class="grade-filter-label">Status</span>
                     <?php
@@ -1421,7 +1553,7 @@ if (empty($schoolId)) {
                   </div>
                 </div>
                 
-                <?php if ($filterYear !== '' || $filterSection !== '' || $filterDept !== '' || $filterLacking || $filterSanctions || $q !== ''): ?>
+                <?php if ($filterYear !== '' || $filterSection !== '' || $filterDept !== '' || $filterMajor !== '' || $filterLacking || $filterSanctions || $q !== ''): ?>
                   <div class="grade-filter-note">
                     <i class="bi bi-info-circle"></i>
                     Showing user assignments
@@ -1433,6 +1565,9 @@ if (empty($schoolId)) {
                     <?php endif; ?>
                     <?php if ($filterDept !== ''): ?>
                       in department <strong><?php echo htmlspecialchars($filterDept); ?></strong>
+                    <?php endif; ?>
+                    <?php if ($filterMajor !== ''): ?>
+                      (Major <strong><?php echo htmlspecialchars($filterMajor); ?></strong>)
                     <?php endif; ?>
                     <?php if ($filterLacking): ?>
                       with <strong>lacking payment</strong>
@@ -1463,6 +1598,7 @@ if (empty($schoolId)) {
                       <th>Year</th>
                       <th>Section</th>
                       <th>Department</th>
+                      <th>Major</th>
                       <th>Payment</th>
                       <th>Sanctions</th>
                       <th>Owing Amount</th>
@@ -1472,7 +1608,7 @@ if (empty($schoolId)) {
                   <tbody>
                     <?php if (empty($ua)): ?>
                       <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="10" class="text-center text-muted py-4">
                           <i class="bi bi-inbox"></i> No user assignments found.
                         </td>
                       </tr>
@@ -1484,6 +1620,8 @@ if (empty($schoolId)) {
                         $year = $r['year'] ?? '';
                         $sectionName = $r['section'] ?? '';
                         $department = $r['department'] ?? '';
+                        if ($department === 'BSEED') { $department = 'BSED'; }
+                        $major = $r['major'] ?? '';
                         $payment = $r['payment'] ?? 'paid';
                         $sanctions = $r['sanctions'] ?? '';
                         $owingAmount = $r['owing_amount'] ?? '';
@@ -1530,6 +1668,7 @@ if (empty($schoolId)) {
                           <td><?php echo htmlspecialchars($year); ?></td>
                           <td><?php echo htmlspecialchars($sectionName); ?></td>
                           <td><?php echo htmlspecialchars($department ?: '-'); ?></td>
+                          <td><?php echo htmlspecialchars($major ?: '-'); ?></td>
                           <td>
                             <span class="badge bg-<?php echo $payment === 'paid' ? 'success' : 'danger'; ?>">
                               <?php echo htmlspecialchars($payment); ?>
@@ -1558,6 +1697,7 @@ if (empty($schoolId)) {
                                 data-payment="<?php echo htmlspecialchars($payment); ?>"
                                 data-sanctions="<?php echo htmlspecialchars($sanctions); ?>"
                                 data-department="<?php echo htmlspecialchars($department); ?>"
+                                data-major="<?php echo htmlspecialchars($major); ?>"
                                 data-owing="<?php echo htmlspecialchars($owingAmount); ?>"
                               >
                                 <div class="svgWrapper">
@@ -1628,22 +1768,54 @@ if (empty($schoolId)) {
             </div>
           </div>
 
-          <?php elseif ($section === 'manage_teachers'): ?>
+          <?php elseif ($section === 'teacher_management'): ?>
             <?php
             require_once __DIR__ . '/../BackEnd/database/db.php';
             $conn = Database::getInstance()->getConnection();
             
-            // Ensure teacher_assignments table exists
+            // Ensure teacher_assignments table exists with new schema
             $conn->query("CREATE TABLE IF NOT EXISTS teacher_assignments (
               id INT AUTO_INCREMENT PRIMARY KEY,
               user_id INT DEFAULT NULL,
-              username VARCHAR(200) NOT NULL,
-              year VARCHAR(10) NOT NULL,
-              subject VARCHAR(255) NOT NULL,
+              teacher_name VARCHAR(200) NOT NULL,
+              subject_code VARCHAR(50) NOT NULL,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               INDEX idx_user_id (user_id),
-              INDEX idx_username (username),
-              INDEX idx_year (year)
+              INDEX idx_teacher_name (teacher_name),
+              INDEX idx_subject_code (subject_code),
+              UNIQUE KEY uniq_teacher_subject (teacher_name, subject_code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            
+            // Migrate old schema to new if needed
+            $colCheck = $conn->query("SHOW COLUMNS FROM teacher_assignments LIKE 'teacher_name'");
+            if ($colCheck && $colCheck->num_rows === 0) {
+              // Old schema exists, migrate it
+              $conn->query("ALTER TABLE teacher_assignments ADD COLUMN teacher_name VARCHAR(200) NOT NULL DEFAULT '' AFTER user_id");
+              $conn->query("ALTER TABLE teacher_assignments ADD COLUMN subject_code VARCHAR(50) NOT NULL DEFAULT '' AFTER teacher_name");
+              $conn->query("UPDATE teacher_assignments SET teacher_name = username, subject_code = subject WHERE teacher_name = '' OR subject_code = ''");
+              $conn->query("ALTER TABLE teacher_assignments DROP COLUMN username");
+              $conn->query("ALTER TABLE teacher_assignments DROP COLUMN year");
+              $conn->query("ALTER TABLE teacher_assignments DROP COLUMN subject");
+              $conn->query("ALTER TABLE teacher_assignments ADD UNIQUE KEY uniq_teacher_subject (teacher_name, subject_code)");
+              $conn->query("ALTER TABLE teacher_assignments ADD INDEX idx_teacher_name (teacher_name)");
+              $conn->query("ALTER TABLE teacher_assignments ADD INDEX idx_subject_code (subject_code)");
+            }
+            if ($colCheck) { $colCheck->close(); }
+            
+            // Ensure subjects table exists
+            $conn->query("CREATE TABLE IF NOT EXISTS subjects (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              subject_code VARCHAR(50) NOT NULL,
+              title VARCHAR(255) NOT NULL,
+              units INT DEFAULT 0,
+              course VARCHAR(20) NOT NULL,
+              major VARCHAR(50) NOT NULL,
+              year_level INT NOT NULL,
+              semester VARCHAR(20) NOT NULL DEFAULT 'First Semester',
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              UNIQUE KEY uniq_subject_code (subject_code),
+              INDEX idx_course_major_year (course, major, year_level, semester)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
             
             // Handle teacher management toasts
@@ -1653,8 +1825,14 @@ if (empty($schoolId)) {
                 $toastMessage = 'Teacher assigned successfully!';
               } elseif ($successMsg === 'teacher_deleted') {
                 $toastMessage = 'Teacher assignment deleted successfully!';
+              } elseif ($successMsg === 'created') {
+                $toastMessage = 'Schedule created successfully!';
+              } elseif ($successMsg === 'updated') {
+                $toastMessage = 'Schedule updated successfully!';
+              } elseif ($successMsg === 'deleted') {
+                $toastMessage = 'Schedule deleted successfully!';
               } else {
-                $toastMessage = 'Teacher assignment saved successfully!';
+                $toastMessage = 'Operation completed successfully!';
               }
               $toastType = 'success';
             } elseif (isset($_GET['error'])) {
@@ -1662,85 +1840,159 @@ if (empty($schoolId)) {
               $errorMsg = $_GET['error'];
               if ($errorMsg === 'user_not_found') {
                 $toastMessage = 'Error: User does not exist in the database. Please check the username or full name.';
+              } elseif ($errorMsg === 'subject_not_found') {
+                $toastMessage = 'Error: Subject does not exist. Please add the subject in the Subjects section first.';
+              } elseif ($errorMsg === 'instructor_not_found') {
+                $toastMessage = 'Error: No teacher assigned to this subject. Please assign a teacher to this subject in "Add Teacher to Subject" first.';
+              } elseif ($errorMsg === 'section_not_found') {
+                $toastMessage = 'Error: Section does not exist. Please add the section first.';
+              } elseif ($errorMsg === 'building_not_found') {
+                $toastMessage = 'Error: Building does not exist. Please add the building first.';
+              } elseif ($errorMsg === 'missing') {
+                $missingFields = isset($_GET['fields']) ? htmlspecialchars($_GET['fields']) : 'required fields';
+                $toastMessage = 'Error: Please fill in all required fields. Missing: ' . $missingFields;
+              } elseif ($errorMsg === 'db_error') {
+                $toastMessage = 'Error: Database error occurred. Please try again.';
+              } elseif ($errorMsg === 'invalid_id') {
+                $toastMessage = 'Error: Invalid ID. Please try again.';
+              } elseif ($errorMsg === 'not_teacher') {
+                $toastMessage = 'Error: Selected user does not have teacher role. Please set the user role to "teacher" in Manage User section first.';
               } else {
                 $toastMessage = 'Error: ' . htmlspecialchars($errorMsg);
               }
             }
             
+            // Check if table has new schema (teacher_name, subject_code) or old (username, year, subject)
+            $colCheck = $conn->query("SHOW COLUMNS FROM teacher_assignments LIKE 'teacher_name'");
+            $hasNewSchema = $colCheck && $colCheck->num_rows > 0;
+            if ($colCheck) { $colCheck->close(); }
+            
             // Get teacher assignments
             $teacherAssignments = [];
-            $teacherQuery = $conn->query("SELECT ta.id, ta.username, ta.year, ta.subject, ta.user_id, u.full_name, COALESCE(u.role, 'teacher') as role FROM teacher_assignments ta LEFT JOIN users u ON ta.user_id = u.id ORDER BY ta.year, ta.subject, ta.username");
+            if ($hasNewSchema) {
+              $teacherQuery = $conn->query("SELECT ta.id, ta.teacher_name, ta.subject_code, ta.user_id, u.full_name, COALESCE(u.role, 'teacher') as role, s.title as subject_title FROM teacher_assignments ta LEFT JOIN users u ON ta.user_id = u.id LEFT JOIN subjects s ON ta.subject_code = s.subject_code ORDER BY ta.teacher_name, ta.subject_code");
+            } else {
+              $teacherQuery = $conn->query("SELECT ta.id, ta.username as teacher_name, ta.year, ta.subject as subject_code, ta.user_id, u.full_name, COALESCE(u.role, 'teacher') as role FROM teacher_assignments ta LEFT JOIN users u ON ta.user_id = u.id ORDER BY ta.year, ta.subject, ta.username");
+            }
             if ($teacherQuery) {
               while ($row = $teacherQuery->fetch_assoc()) {
                 $teacherAssignments[] = $row;
               }
             }
+            
+            // Get all subjects for dropdown
+            $allSubjects = [];
+            $subjectsQuery = $conn->query("SELECT subject_code, title FROM subjects ORDER BY subject_code");
+            if ($subjectsQuery) {
+              while ($row = $subjectsQuery->fetch_assoc()) {
+                $allSubjects[] = $row;
+              }
+            }
+            
+            // Get available buildings for schedule form
+            $availableBuildings = [];
+            $buildingsQuery = $conn->query("SELECT name FROM buildings ORDER BY name");
+            if ($buildingsQuery) {
+              while ($row = $buildingsQuery->fetch_assoc()) {
+                $availableBuildings[] = $row['name'];
+              }
+            }
+            // Also check JSON fallback
+            if (empty($availableBuildings)) {
+              $buildingsPath = __DIR__ . '/../database/buildings.json';
+              if (file_exists($buildingsPath)) {
+                $buildingsData = json_decode(file_get_contents($buildingsPath), true) ?: [];
+                $availableBuildings = array_keys($buildingsData);
+              }
+            }
+            
+            // Get available sections for schedule form
+            $availableSections = [];
+            $sectionsQuery = $conn->query("SELECT DISTINCT name FROM sections ORDER BY name");
+            if ($sectionsQuery) {
+              while ($row = $sectionsQuery->fetch_assoc()) {
+                $availableSections[] = $row['name'];
+              }
+            }
+            
+            // Ensure schedules table has class_type column
+            $colCheck = $conn->query("SHOW COLUMNS FROM schedules LIKE 'class_type'");
+            if ($colCheck && $colCheck->num_rows === 0) {
+              $conn->query("ALTER TABLE schedules ADD COLUMN class_type ENUM('day', 'night') DEFAULT 'day' AFTER building");
+            }
+            if ($colCheck) { $colCheck->close(); }
             ?>
             <div class="records-container">
               <div class="records-header">
                 <h2 class="records-title">
-                  <i class="bi bi-person-badge"></i> Manage Teachers
+                  <i class="bi bi-person-badge"></i> Teacher Management
                 </h2>
-                <p class="records-subtitle">Assign teachers to years and subjects, manage instructor assignments</p>
+                <p class="records-subtitle">Assign teachers to subjects, manage instructor assignments</p>
               </div>
               <div class="records-main">
                 <div class="info-card">
                   <div class="card-header-modern">
                     <i class="bi bi-person-badge"></i>
-                    <h3>Assign Teacher to Year / Subject</h3>
+                    <h3>Add Teacher to Subject</h3>
                   </div>
                   <form action="/TCC/BackEnd/admin/manage_users.php" method="post" class="admin-user-assign-form" id="assignTeacherForm">
                     <input type="hidden" name="action" value="assign_teacher" />
                     <input type="hidden" id="teacherUserIdHidden" name="existing_user_id" value="" />
                     <div class="row g-3">
-                      <div class="col-md-6">
-                        <div class="admin-form-group">
-                          <label class="admin-form-label" for="teacherSearchInput">
-                            <i class="bi bi-search"></i> Teacher Search
-                          </label>
-                          <div class="admin-search-wrapper">
-                            <input type="text" id="teacherSearchInput" class="form-control form-control-lg" placeholder="Start typing a name or username" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="teacherSearchList" aria-haspopup="listbox" />
-                            <ul id="teacherSearchList" role="listbox" class="admin-search-dropdown" aria-hidden="true"></ul>
-                          </div>
-                          <div class="admin-hint">
-                            <i class="bi bi-info-circle"></i>
-                            <span>Select a suggestion to map to an existing teacher account, or type a full name to create an assignment without a user account.</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="col-md-6">
+                      <div class="col-md-5">
                         <div class="admin-form-group">
                           <label class="admin-form-label" for="teacherFullName">
-                            <i class="bi bi-person-badge"></i> Full Name
+                            <i class="bi bi-person-badge"></i> Teacher Name
                           </label>
-                          <input type="text" id="teacherFullName" name="full_name" class="form-control form-control-lg" placeholder="Full Name (e.g. Ms. Johnson)" required />
-                        </div>
-                      </div>
-                      <div class="col-md-4">
-                        <div class="admin-form-group">
-                          <label class="admin-form-label" for="teacherYear">
-                            <i class="bi bi-calendar-year"></i> Year
-                          </label>
-                          <select name="year" id="teacherYear" class="form-select form-select-lg" required>
-                            <option value="">Select Year...</option>
-                            <option value="1">1st Year</option>
-                            <option value="2">2nd Year</option>
-                            <option value="3">3rd Year</option>
-                            <option value="4">4th Year</option>
+                          <select id="teacherFullName" name="full_name" class="form-select form-select-lg" required>
+                            <option value="">Select Teacher...</option>
+                            <?php
+                            // Get all users with role='teacher'
+                            $teacherUsers = [];
+                            $teacherUsersQuery = $conn->query("SELECT id, full_name, username FROM users WHERE role = 'teacher' ORDER BY full_name");
+                            if ($teacherUsersQuery) {
+                              while ($tRow = $teacherUsersQuery->fetch_assoc()) {
+                                $teacherUsers[] = $tRow;
+                              }
+                            }
+                            foreach ($teacherUsers as $tUser): ?>
+                              <option value="<?php echo htmlspecialchars($tUser['full_name']); ?>" data-user-id="<?php echo (int)$tUser['id']; ?>">
+                                <?php echo htmlspecialchars($tUser['full_name']); ?>
+                              </option>
+                            <?php endforeach; ?>
                           </select>
+                          <div class="admin-hint mt-2">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Only users with role='teacher' can be assigned. If a teacher is not in the list, set their role to 'teacher' in Manage User section first.</span>
+                          </div>
                         </div>
                       </div>
                       <div class="col-md-5">
                         <div class="admin-form-group">
-                          <label class="admin-form-label" for="teacherSubject">
-                            <i class="bi bi-book"></i> Subject
+                          <label class="admin-form-label" for="teacherSubjectCode">
+                            <i class="bi bi-book"></i> Subject Code
                           </label>
-                          <input type="text" name="subject" id="teacherSubject" class="form-control form-control-lg" placeholder="e.g. Mathematics, English, Science" required />
+                          <select name="subject_code" id="teacherSubjectCode" class="form-select form-select-lg" required>
+                            <option value="">Select Subject...</option>
+                            <?php if (empty($allSubjects)): ?>
+                              <option value="" disabled>No subjects available. Add subjects first.</option>
+                            <?php else: ?>
+                              <?php foreach ($allSubjects as $subj): ?>
+                                <option value="<?php echo htmlspecialchars($subj['subject_code']); ?>">
+                                  <?php echo htmlspecialchars($subj['subject_code'] . ' — ' . $subj['title']); ?>
+                                </option>
+                              <?php endforeach; ?>
+                            <?php endif; ?>
+                          </select>
+                          <div class="admin-hint mt-2">
+                            <i class="bi bi-info-circle"></i>
+                            <span><?php echo empty($allSubjects) ? 'No subjects found. Please add subjects in the Subjects section first.' : 'Subject must exist in the subjects list first'; ?></span>
+                          </div>
                         </div>
                       </div>
-                      <div class="col-md-3 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary btn-lg w-100">
-                          <i class="bi bi-check-circle me-2"></i>Assign Teacher
+                      <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                          <i class="bi bi-check-circle me-2"></i>Add
                         </button>
                       </div>
                     </div>
@@ -1750,73 +2002,284 @@ if (empty($schoolId)) {
                 <div class="info-card mt-3">
                   <div class="card-header-modern">
                     <i class="bi bi-list-check"></i>
-                    <h3>Teacher Assignments (<?php echo count($teacherAssignments); ?> total)</h3>
+                    <h3>Teacher Assignments</h3>
+                    <span class="badge bg-secondary ms-auto"><?php echo count($teacherAssignments); ?> total</span>
                   </div>
-                  <div class="table-responsive">
-                    <table class="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>Teacher Name</th>
-                          <th>Role</th>
-                          <th>Year</th>
-                          <th>Subject</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <?php if (empty($teacherAssignments)): ?>
+                  <?php if (empty($teacherAssignments)): ?>
+                    <div class="text-center text-muted py-5">
+                      <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                      <p class="mt-3 mb-0">No teacher assignments found. Add a teacher above to get started.</p>
+                    </div>
+                  <?php else: ?>
+                    <div class="table-responsive">
+                      <table class="table table-hover align-middle">
+                        <thead>
                           <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
-                              <i class="bi bi-inbox"></i> No teacher assignments found.
-                            </td>
+                            <th style="width: 25%;">Teacher Name</th>
+                            <th style="width: 15%;">Subject Code</th>
+                            <th style="width: 45%;">Subject Title</th>
+                            <th style="width: 15%;" class="text-center">Actions</th>
                           </tr>
-                        <?php else: ?>
-                          <?php foreach ($teacherAssignments as $ta): 
-                            $taRole = $ta['role'] ?? 'teacher';
-                            $taRoleBadgeClass = 'info';
-                            $taRoleLabel = ucfirst($taRole);
-                            if ($taRole === 'admin') {
-                              $taRoleBadgeClass = 'danger';
-                            } elseif ($taRole === 'teacher') {
-                              $taRoleBadgeClass = 'info';
-                            } elseif ($taRole === 'student') {
-                              $taRoleBadgeClass = 'success';
-                            }
-                          ?>
+                        </thead>
+                        <tbody>
+                          <?php foreach ($teacherAssignments as $ta): ?>
                             <tr>
-                              <td><strong><?php echo htmlspecialchars($ta['full_name'] ?? $ta['username']); ?></strong></td>
                               <td>
-                                <span class="badge bg-<?php echo $taRoleBadgeClass; ?>">
-                                  <?php echo htmlspecialchars($taRoleLabel); ?>
-                                </span>
+                                <strong><?php echo htmlspecialchars($ta['full_name'] ?? $ta['teacher_name'] ?? 'Unknown'); ?></strong>
                               </td>
-                              <td><?php echo htmlspecialchars($ta['year']); ?></td>
-                              <td><?php echo htmlspecialchars($ta['subject']); ?></td>
                               <td>
+                                <code class="bg-light px-2 py-1 rounded"><?php echo htmlspecialchars($ta['subject_code'] ?? 'N/A'); ?></code>
+                              </td>
+                              <td><?php echo htmlspecialchars($ta['subject_title'] ?? 'N/A'); ?></td>
+                              <td class="text-center">
                                 <form method="post" action="/TCC/BackEnd/admin/manage_users.php" onsubmit="return confirm('Are you sure you want to delete this teacher assignment? This action cannot be undone.');" style="display:inline;">
                                   <input type="hidden" name="action" value="delete_teacher" />
                                   <input type="hidden" name="id" value="<?php echo (int)$ta['id']; ?>" />
-                                  <button type="submit" class="Btn Btn-delete">
-                                    <div class="svgWrapper">
-                                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 42 42" class="svgIcon">
-                                        <path stroke-width="5" stroke="#fff" d="M9.14073 2.5H32.8593C33.3608 2.5 33.8291 2.75065 34.1073 3.16795L39.0801 10.6271C39.3539 11.0378 39.5 11.5203 39.5 12.0139V21V37C39.5 38.3807 38.3807 39.5 37 39.5H5C3.61929 39.5 2.5 38.3807 2.5 37V21V12.0139C2.5 11.5203 2.6461 11.0378 2.91987 10.6271L7.89266 3.16795C8.17086 2.75065 8.63921 2.5 9.14073 2.5Z"></path>
-                                        <path stroke-width="5" stroke="#fff" d="M14 18L28 18M18 14V30M24 14V30"></path>
-                                      </svg>
-                                      <div class="text">Delete</div>
-                                    </div>
+                                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Assignment">
+                                    <i class="bi bi-trash"></i>
                                   </button>
                                 </form>
                               </td>
                             </tr>
                           <?php endforeach; ?>
-                        <?php endif; ?>
-                      </tbody>
-                    </table>
+                        </tbody>
+                      </table>
+                    </div>
+                  <?php endif; ?>
+                </div>
+                
+                <div class="info-card mt-3">
+                  <div class="card-header-modern">
+                    <i class="bi bi-calendar-plus"></i>
+                    <h3>Add Teacher Schedule</h3>
                   </div>
+                  <form action="/TCC/BackEnd/admin/manage_schedules.php" method="post" class="admin-user-assign-form">
+                    <input type="hidden" name="action" value="create" />
+                    <input type="hidden" name="from_section" value="teacher_management" />
+                    <div class="row g-3">
+                      <div class="col-md-4">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleSubjectCode">
+                            <i class="bi bi-book"></i> Subject Code
+                          </label>
+                          <select name="subject" id="scheduleSubjectCode" class="form-select form-select-lg" required>
+                            <option value="">Select Subject...</option>
+                            <?php foreach ($allSubjects as $subj): ?>
+                              <option value="<?php echo htmlspecialchars($subj['subject_code']); ?>" data-teacher="<?php 
+                                // Find teacher assigned to this subject
+                                $teacherForSubject = '';
+                                $teacherCheck = $conn->prepare("SELECT teacher_name FROM teacher_assignments WHERE subject_code = ? LIMIT 1");
+                                if ($teacherCheck) {
+                                  $teacherCheck->bind_param('s', $subj['subject_code']);
+                                  $teacherCheck->execute();
+                                  $teacherResult = $teacherCheck->get_result();
+                                  if ($teacherRow = $teacherResult->fetch_assoc()) {
+                                    $teacherForSubject = htmlspecialchars($teacherRow['teacher_name']);
+                                  }
+                                  $teacherCheck->close();
+                                }
+                                echo $teacherForSubject;
+                              ?>">
+                                <?php echo htmlspecialchars($subj['subject_code'] . ' — ' . $subj['title']); ?>
+                                <?php if (!empty($teacherForSubject)): ?>
+                                  <span class="text-muted">(<?php echo htmlspecialchars($teacherForSubject); ?>)</span>
+                                <?php endif; ?>
+                              </option>
+                            <?php endforeach; ?>
+                          </select>
+                          <div class="admin-hint mt-2">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Teacher will be automatically assigned based on the subject. Make sure the subject has a teacher assigned in "Add Teacher to Subject" above.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleYear">
+                            <i class="bi bi-calendar-year"></i> Year
+                          </label>
+                          <select name="year" id="scheduleYear" class="form-select form-select-lg" required>
+                            <option value="">Select...</option>
+                            <option value="1">1st Year</option>
+                            <option value="2">2nd Year</option>
+                            <option value="3">3rd Year</option>
+                            <option value="4">4th Year</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleSection">
+                            <i class="bi bi-people"></i> Section
+                          </label>
+                          <select name="section" id="scheduleSection" class="form-select form-select-lg">
+                            <option value="">Select...</option>
+                            <?php foreach ($availableSections as $sec): ?>
+                              <option value="<?php echo htmlspecialchars($sec); ?>">
+                                <?php echo htmlspecialchars($sec); ?>
+                              </option>
+                            <?php endforeach; ?>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleDay">
+                            <i class="bi bi-calendar-day"></i> Day
+                          </label>
+                          <select name="day" id="scheduleDay" class="form-select form-select-lg" required>
+                            <option value="">Select...</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleClassType">
+                            <i class="bi bi-sun-moon"></i> Class Type
+                          </label>
+                          <select name="class_type" id="scheduleClassType" class="form-select form-select-lg" required>
+                            <option value="day">Day</option>
+                            <option value="night">Night</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleTimeStart">
+                            <i class="bi bi-clock"></i> Time Start
+                          </label>
+                          <input type="time" name="time_start" id="scheduleTimeStart" class="form-control form-control-lg" required />
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleTimeEnd">
+                            <i class="bi bi-clock-history"></i> Time End
+                          </label>
+                          <input type="time" name="time_end" id="scheduleTimeEnd" class="form-control form-control-lg" required />
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleBuilding">
+                            <i class="bi bi-building"></i> Building
+                          </label>
+                          <select name="building" id="scheduleBuilding" class="form-select form-select-lg">
+                            <option value="">Select...</option>
+                            <?php foreach ($availableBuildings as $bld): ?>
+                              <option value="<?php echo htmlspecialchars($bld); ?>">
+                                <?php echo htmlspecialchars($bld); ?>
+                              </option>
+                            <?php endforeach; ?>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="admin-form-group">
+                          <label class="admin-form-label" for="scheduleRoom">
+                            <i class="bi bi-door-closed"></i> Room Number
+                          </label>
+                          <input type="text" name="room" id="scheduleRoom" class="form-control form-control-lg" placeholder="e.g. 301" />
+                        </div>
+                      </div>
+                      <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                          <i class="bi bi-check-circle me-2"></i>Add Schedule
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+                
+                <?php
+                // Get all schedules for display
+                $allSchedules = [];
+                $schedulesQuery = $conn->query("SELECT s.id, s.year, s.subject, s.day, s.time_start, s.time_end, s.room, s.section, s.building, s.class_type, s.instructor, ta.teacher_name FROM schedules s LEFT JOIN teacher_assignments ta ON s.subject = ta.subject_code ORDER BY s.day, s.time_start");
+                if ($schedulesQuery) {
+                  while ($schedRow = $schedulesQuery->fetch_assoc()) {
+                    $allSchedules[] = $schedRow;
+                  }
+                }
+                ?>
+                
+                <div class="info-card mt-3">
+                  <div class="card-header-modern">
+                    <i class="bi bi-calendar-check"></i>
+                    <h3>Teacher Schedules</h3>
+                    <span class="badge bg-secondary ms-auto"><?php echo count($allSchedules); ?> total</span>
+                  </div>
+                  <?php if (empty($allSchedules)): ?>
+                    <div class="text-center text-muted py-5">
+                      <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                      <p class="mt-3 mb-0">No schedules found. Add a schedule above to get started.</p>
+                    </div>
+                  <?php else: ?>
+                    <div class="table-responsive">
+                      <table class="table table-hover align-middle">
+                        <thead>
+                          <tr>
+                            <th style="width: 15%;">Teacher</th>
+                            <th style="width: 12%;">Subject</th>
+                            <th style="width: 8%;">Year</th>
+                            <th style="width: 10%;">Section</th>
+                            <th style="width: 10%;">Day</th>
+                            <th style="width: 12%;">Time</th>
+                            <th style="width: 8%;">Type</th>
+                            <th style="width: 8%;">Room</th>
+                            <th style="width: 7%;">Building</th>
+                            <th style="width: 10%;" class="text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <?php foreach ($allSchedules as $sched): 
+                            $timeStart = date('g:i A', strtotime($sched['time_start']));
+                            $timeEnd = date('g:i A', strtotime($sched['time_end']));
+                            $timeRange = $timeStart . ' - ' . $timeEnd;
+                            $classType = $sched['class_type'] ?? 'day';
+                          ?>
+                            <tr>
+                              <td>
+                                <strong><?php echo htmlspecialchars($sched['instructor'] ?? $sched['teacher_name'] ?? 'N/A'); ?></strong>
+                              </td>
+                              <td>
+                                <code class="bg-light px-2 py-1 rounded"><?php echo htmlspecialchars($sched['subject'] ?? 'N/A'); ?></code>
+                              </td>
+                              <td><?php echo htmlspecialchars($sched['year'] ?? 'N/A'); ?></td>
+                              <td><?php echo htmlspecialchars($sched['section'] ?? '—'); ?></td>
+                              <td><?php echo htmlspecialchars($sched['day'] ?? 'N/A'); ?></td>
+                              <td><?php echo htmlspecialchars($timeRange); ?></td>
+                              <td>
+                                <span class="badge bg-<?php echo $classType === 'night' ? 'dark' : 'warning'; ?>">
+                                  <?php echo htmlspecialchars(ucfirst($classType)); ?>
+                                </span>
+                              </td>
+                              <td><?php echo htmlspecialchars($sched['room'] ?? '—'); ?></td>
+                              <td><?php echo htmlspecialchars($sched['building'] ?? '—'); ?></td>
+                              <td class="text-center">
+                                <form method="post" action="/TCC/BackEnd/admin/manage_schedules.php" onsubmit="return confirm('Are you sure you want to delete this schedule? This action cannot be undone.');" style="display:inline;">
+                                  <input type="hidden" name="action" value="delete" />
+                                  <input type="hidden" name="id" value="<?php echo (int)$sched['id']; ?>" />
+                                  <input type="hidden" name="from_section" value="teacher_management" />
+                                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Schedule">
+                                    <i class="bi bi-trash"></i>
+                                  </button>
+                                </form>
+                              </td>
+                            </tr>
+                          <?php endforeach; ?>
+                        </tbody>
+                      </table>
+                    </div>
+                  <?php endif; ?>
                 </div>
               </div>
             </div>
-          </div>
 
           <?php elseif ($section === 'schedule_management'): ?>
             <?php
@@ -2437,6 +2900,644 @@ if (empty($schoolId)) {
                 <?php endif; ?>
               </div>
             </div>
+          <?php elseif ($section === 'subjects'): ?>
+            <?php
+            require_once __DIR__ . '/../BackEnd/database/db.php';
+            $conn = Database::getInstance()->getConnection();
+            $conn->query("CREATE TABLE IF NOT EXISTS subjects (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              subject_code VARCHAR(50) NOT NULL,
+              title VARCHAR(255) NOT NULL,
+              units INT DEFAULT 0,
+              course VARCHAR(20) NOT NULL,
+              major VARCHAR(50) NOT NULL,
+              year_level INT NOT NULL,
+              semester VARCHAR(20) NOT NULL DEFAULT 'First Semester',
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              UNIQUE KEY uniq_subject_code (subject_code),
+              INDEX idx_course_major_year (course, major, year_level, semester)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $subjectToastMessage = '';
+            $subjectToastType = 'success';
+            if (isset($_GET['success'])) {
+              $subjectToastMessage = match ($_GET['success']) {
+                'created' => 'Subject added successfully!',
+                'updated' => 'Subject updated successfully!',
+                'deleted' => 'Subject deleted successfully!',
+                default => 'Subject saved successfully!'
+              };
+            } elseif (isset($_GET['error'])) {
+              $subjectToastType = 'error';
+              $subjectToastMessage = match ($_GET['error']) {
+                'missing' => 'Please fill out all subject fields.',
+                'duplicate' => 'Subject code already exists.',
+                'invalid_major' => 'Select a valid major for the chosen course.',
+                'year_range' => 'Year level must be between 1 and 4.',
+                'invalid_semester' => 'Please select a valid semester.',
+                'db_error' => 'Database error occurred. Please try again or contact support.',
+                default => 'Unable to save subject right now.'
+              };
+            }
+
+            $editSubjectId = isset($_GET['edit_subject_id']) ? (int)$_GET['edit_subject_id'] : 0;
+            $editSubjectRow = null;
+            if ($editSubjectId > 0) {
+              $stmt = $conn->prepare("SELECT id, subject_code, title, units, course, major, year_level, semester FROM subjects WHERE id = ? LIMIT 1");
+              $stmt->bind_param('i', $editSubjectId);
+              $stmt->execute();
+              $res = $stmt->get_result();
+              $editSubjectRow = $res->fetch_assoc();
+              $stmt->close();
+            }
+
+            $subjects = [];
+            $subjectsQuery = $conn->query("SELECT id, subject_code, title, units, course, major, year_level, semester, updated_at FROM subjects ORDER BY course, major, year_level, semester, subject_code");
+            if ($subjectsQuery) {
+              while ($row = $subjectsQuery->fetch_assoc()) {
+                $subjects[] = $row;
+              }
+            }
+            ?>
+            <div class="records-container">
+              <div class="records-header">
+                <h2 class="records-title">
+                  <i class="bi bi-journal-text"></i> Subject Catalog
+                </h2>
+                <p class="records-subtitle">Centralize subject codes, titles, and units to avoid typos when building study loads.</p>
+              </div>
+              <div class="records-main">
+                <?php if (!empty($subjectToastMessage)): ?>
+                  <div class="alert alert-<?php echo $subjectToastType === 'error' ? 'danger' : 'success'; ?> alert-dismissible fade show" role="alert">
+                    <?php echo htmlspecialchars($subjectToastMessage); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                <?php endif; ?>
+
+                <div class="info-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-pencil-square"></i>
+                    <h3><?php echo $editSubjectRow ? 'Edit Subject' : 'Add New Subject'; ?></h3>
+                  </div>
+                  <form class="form-small" action="/TCC/BackEnd/admin/manage_subjects.php" method="post">
+                    <input type="hidden" name="action" value="<?php echo $editSubjectRow ? 'update' : 'create'; ?>" />
+                    <?php if ($editSubjectRow): ?>
+                      <input type="hidden" name="id" value="<?php echo (int)$editSubjectRow['id']; ?>" />
+                    <?php endif; ?>
+                    <div class="row g-3">
+                      <div class="col-md-3">
+                        <label class="admin-form-label" for="subjectCodeInput">
+                          <i class="bi bi-upc-scan"></i> Subject Code
+                        </label>
+                        <input id="subjectCodeInput" name="subject_code" class="form-control form-control-lg" placeholder="e.g. IT101" value="<?php echo $editSubjectRow ? htmlspecialchars($editSubjectRow['subject_code']) : ''; ?>" required />
+                      </div>
+                      <div class="col-md-4">
+                        <label class="admin-form-label" for="subjectTitleInput">
+                          <i class="bi bi-journal-text"></i> Descriptive Title
+                        </label>
+                        <input id="subjectTitleInput" name="title" class="form-control form-control-lg" placeholder="Descriptive Title" value="<?php echo $editSubjectRow ? htmlspecialchars($editSubjectRow['title']) : ''; ?>" required />
+                      </div>
+                      <div class="col-md-2">
+                        <label class="admin-form-label" for="subjectUnitsInput">
+                          <i class="bi bi-hash"></i> Units
+                        </label>
+                        <input id="subjectUnitsInput" name="units" type="number" min="0" step="1" class="form-control form-control-lg" value="<?php echo $editSubjectRow ? (int)$editSubjectRow['units'] : ''; ?>" required />
+                      </div>
+                      <div class="col-md-3">
+                        <label class="admin-form-label" for="subjectCourseSelect">
+                          <i class="bi bi-mortarboard"></i> Course
+                        </label>
+                        <select id="subjectCourseSelect" name="course" class="form-select form-select-lg" required data-course-select>
+                          <option value="">Select course...</option>
+                          <?php foreach ($courseMajorMap as $courseKey => $majorsList): ?>
+                            <option value="<?php echo $courseKey; ?>" <?php echo ($editSubjectRow && $editSubjectRow['course'] === $courseKey) ? 'selected' : ''; ?>>
+                              <?php echo $courseKey; ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="admin-form-label" for="subjectMajorSelect">
+                          <i class="bi bi-diagram-3"></i> Major
+                        </label>
+                        <select id="subjectMajorSelect" name="major" class="form-select form-select-lg" required data-major-select>
+                          <option value="">Select major...</option>
+                          <?php
+                          $activeCourse = $editSubjectRow['course'] ?? array_key_first($courseMajorMap);
+                          foreach ($courseMajorMap as $courseKey => $majorsList):
+                            foreach ($majorsList as $majorName):
+                          ?>
+                              <option value="<?php echo htmlspecialchars($majorName); ?>" data-course="<?php echo $courseKey; ?>" <?php echo ($editSubjectRow && $editSubjectRow['major'] === $majorName) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($majorName); ?>
+                              </option>
+                          <?php
+                            endforeach;
+                          endforeach;
+                          ?>
+                        </select>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="admin-form-label" for="subjectYearSelect">
+                          <i class="bi bi-calendar-year"></i> Year Level
+                        </label>
+                        <select id="subjectYearSelect" name="year_level" class="form-select form-select-lg" required>
+                          <option value="">Select year...</option>
+                          <?php for ($y = 1; $y <= 4; $y++): ?>
+                            <option value="<?php echo $y; ?>" <?php echo ($editSubjectRow && (int)$editSubjectRow['year_level'] === $y) ? 'selected' : ''; ?>>
+                              <?php echo formatOrdinal($y); ?>
+                            </option>
+                          <?php endfor; ?>
+                        </select>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="admin-form-label" for="subjectSemesterSelect">
+                          <i class="bi bi-clock-history"></i> Semester
+                        </label>
+                        <select id="subjectSemesterSelect" name="semester" class="form-select form-select-lg" required data-selected="<?php echo $editSubjectRow ? htmlspecialchars($editSubjectRow['semester'] ?? '') : 'First Semester'; ?>">
+                          <?php foreach ($semesterOptions as $semOption): ?>
+                            <option value="<?php echo htmlspecialchars($semOption); ?>" <?php echo ($editSubjectRow && ($editSubjectRow['semester'] ?? '') === $semOption) ? 'selected' : ''; ?>>
+                              <?php echo htmlspecialchars($semOption); ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="mt-3 d-flex gap-2">
+                      <button class="btn btn-primary btn-lg" type="submit">
+                        <i class="bi bi-check-circle me-2"></i><?php echo $editSubjectRow ? 'Save Changes' : 'Add Subject'; ?>
+                      </button>
+                      <?php if ($editSubjectRow): ?>
+                        <a href="/TCC/public/admin_dashboard.php?section=subjects" class="btn btn-outline-secondary btn-lg">
+                          <i class="bi bi-x-circle me-2"></i>Cancel
+                        </a>
+                      <?php endif; ?>
+                    </div>
+                  </form>
+                </div>
+
+                <div class="info-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-list-task"></i>
+                    <h3>Subject List</h3>
+                    <span class="badge bg-secondary ms-auto"><?php echo count($subjects); ?> total</span>
+                  </div>
+                  <?php if (empty($subjects)): ?>
+                    <p class="text-muted mb-0">No subjects recorded yet. Add one using the form above.</p>
+                  <?php else: ?>
+                    <div class="table-responsive">
+                      <table class="table table-hover align-middle">
+                        <thead>
+                          <tr>
+                            <th>Code</th>
+                            <th>Title</th>
+                            <th>Units</th>
+                            <th>Course</th>
+                            <th>Major</th>
+                            <th>Year</th>
+                            <th>Semester</th>
+                            <th>Updated</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <?php foreach ($subjects as $subject): ?>
+                            <tr>
+                              <td><strong><?php echo htmlspecialchars($subject['subject_code']); ?></strong></td>
+                              <td><?php echo htmlspecialchars($subject['title']); ?></td>
+                              <td><?php echo (int)$subject['units']; ?></td>
+                              <td><?php echo htmlspecialchars($subject['course']); ?></td>
+                              <td><?php echo htmlspecialchars($subject['major']); ?></td>
+                              <td><?php echo formatOrdinal((int)$subject['year_level']); ?></td>
+                              <td><?php echo htmlspecialchars($subject['semester']); ?></td>
+                              <td><?php echo htmlspecialchars(date('M d, Y', strtotime($subject['updated_at']))); ?></td>
+                              <td>
+                                <div class="d-flex gap-2">
+                                  <a href="/TCC/public/admin_dashboard.php?section=subjects&edit_subject_id=<?php echo (int)$subject['id']; ?>" class="btn btn-sm btn-outline-primary" title="Edit Subject">
+                                    <i class="bi bi-pencil"></i>
+                                  </a>
+                                  <form method="post" action="/TCC/BackEnd/admin/manage_subjects.php" onsubmit="return confirm('Delete subject <?php echo htmlspecialchars($subject['subject_code']); ?>?');">
+                                    <input type="hidden" name="action" value="delete" />
+                                    <input type="hidden" name="id" value="<?php echo (int)$subject['id']; ?>" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Subject">
+                                      <i class="bi bi-trash"></i>
+                                    </button>
+                                  </form>
+                                </div>
+                              </td>
+                            </tr>
+                          <?php endforeach; ?>
+                        </tbody>
+                      </table>
+                    </div>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </div>
+          <?php elseif ($section === 'study_load'): ?>
+            <?php
+            require_once __DIR__ . '/../BackEnd/database/db.php';
+            $conn = Database::getInstance()->getConnection();
+            $conn->query("CREATE TABLE IF NOT EXISTS study_load (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              course VARCHAR(20) NOT NULL,
+              major VARCHAR(50) NOT NULL,
+              year_level INT NOT NULL,
+              section VARCHAR(100) NOT NULL,
+              subject_code VARCHAR(50) NOT NULL,
+              subject_title VARCHAR(255) NOT NULL,
+              units INT DEFAULT 0,
+              semester VARCHAR(20) NOT NULL DEFAULT 'First Semester',
+              teacher VARCHAR(255) DEFAULT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              UNIQUE KEY uniq_load (course, major, year_level, section, semester, subject_code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $conn->query("CREATE TABLE IF NOT EXISTS sections (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              year VARCHAR(10) NOT NULL,
+              name VARCHAR(100) NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE KEY uniq_year_name (year, name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $courseKeys = array_keys($courseMajorMap);
+            $selectedCourse = strtoupper($_GET['filter_course'] ?? ($courseKeys[0] ?? 'IT'));
+            if (!isset($courseMajorMap[$selectedCourse])) {
+              $selectedCourse = $courseKeys[0] ?? 'IT';
+            }
+            $selectedMajor = isset($_GET['filter_major']) ? trim($_GET['filter_major']) : ($courseMajorMap[$selectedCourse][0] ?? '');
+            if (!in_array($selectedMajor, $courseMajorMap[$selectedCourse], true)) {
+              $selectedMajor = $courseMajorMap[$selectedCourse][0] ?? '';
+            }
+            $selectedYear = (int)($_GET['filter_year'] ?? 1);
+            if ($selectedYear < 1 || $selectedYear > 4) {
+              $selectedYear = 1;
+            }
+            $selectedSemester = isset($_GET['filter_semester']) ? trim($_GET['filter_semester']) : ($semesterOptions[0] ?? 'First Semester');
+            if (!in_array($selectedSemester, $semesterOptions, true)) {
+              $selectedSemester = $semesterOptions[0] ?? 'First Semester';
+            }
+
+            $sectionsForYear = [];
+            $stmtSections = $conn->prepare("SELECT name FROM sections WHERE year = ? ORDER BY name");
+            if ($stmtSections) {
+              $yearString = (string)$selectedYear;
+              $stmtSections->bind_param('s', $yearString);
+              $stmtSections->execute();
+              $resSections = $stmtSections->get_result();
+              while ($row = $resSections->fetch_assoc()) {
+                $sectionsForYear[] = $row['name'];
+              }
+              $stmtSections->close();
+            }
+            $selectedSection = trim($_GET['filter_section'] ?? '');
+            if ($selectedSection === '' && !empty($sectionsForYear)) {
+              $selectedSection = $sectionsForYear[0];
+            }
+
+            $subjectsAvailable = [];
+            $stmtSubjects = $conn->prepare("SELECT subject_code, title, units FROM subjects WHERE course = ? AND major = ? AND year_level = ? AND semester = ? ORDER BY subject_code");
+            if ($stmtSubjects) {
+              $stmtSubjects->bind_param('ssis', $selectedCourse, $selectedMajor, $selectedYear, $selectedSemester);
+              $stmtSubjects->execute();
+              $resSubjects = $stmtSubjects->get_result();
+              while ($row = $resSubjects->fetch_assoc()) {
+                $subjectsAvailable[] = $row;
+              }
+              $stmtSubjects->close();
+            }
+            
+            // Fetch teacher assignments for subjects
+            $teacherAssignmentsMap = [];
+            $colCheck = $conn->query("SHOW COLUMNS FROM teacher_assignments LIKE 'teacher_name'");
+            $hasNewSchema = $colCheck && $colCheck->num_rows > 0;
+            if ($colCheck) { $colCheck->close(); }
+            
+            if ($hasNewSchema) {
+              $teacherAssignQuery = $conn->query("SELECT subject_code, teacher_name FROM teacher_assignments");
+            } else {
+              $teacherAssignQuery = $conn->query("SELECT subject as subject_code, username as teacher_name FROM teacher_assignments");
+            }
+            if ($teacherAssignQuery) {
+              while ($row = $teacherAssignQuery->fetch_assoc()) {
+                $subjCode = strtoupper(trim($row['subject_code'] ?? ''));
+                if ($subjCode !== '') {
+                  if (!isset($teacherAssignmentsMap[$subjCode])) {
+                    $teacherAssignmentsMap[$subjCode] = [];
+                  }
+                  $teacherAssignmentsMap[$subjCode][] = $row['teacher_name'];
+                }
+              }
+            }
+            
+            // Add teacher info to subjects
+            foreach ($subjectsAvailable as &$subj) {
+              $subjCode = strtoupper(trim($subj['subject_code'] ?? ''));
+              $subj['teacher'] = isset($teacherAssignmentsMap[$subjCode]) && !empty($teacherAssignmentsMap[$subjCode]) 
+                ? $teacherAssignmentsMap[$subjCode][0] 
+                : '';
+            }
+            unset($subj);
+
+            $assignedSubjects = [];
+            $assignedTotals = ['subjects' => 0, 'units' => 0];
+            if ($selectedSection !== '') {
+              $stmtAssigned = $conn->prepare("SELECT id, subject_code, subject_title, units, semester, teacher FROM study_load WHERE course = ? AND major = ? AND year_level = ? AND section = ? AND semester = ? ORDER BY semester, subject_code");
+              if ($stmtAssigned) {
+                $stmtAssigned->bind_param('ssiss', $selectedCourse, $selectedMajor, $selectedYear, $selectedSection, $selectedSemester);
+                $stmtAssigned->execute();
+                $resAssigned = $stmtAssigned->get_result();
+                while ($row = $resAssigned->fetch_assoc()) {
+                  $assignedSubjects[] = $row;
+                  $assignedTotals['subjects']++;
+                  $assignedTotals['units'] += (int)$row['units'];
+                }
+                $stmtAssigned->close();
+              }
+            }
+
+            $studyToastMessage = '';
+            $studyToastType = 'success';
+            if (isset($_GET['success'])) {
+              $studyToastMessage = match ($_GET['success']) {
+                'created' => 'Subject added to study load!',
+                'updated' => 'Subject updated successfully!',
+                'deleted' => 'Subject removed from study load.',
+                default => 'Study load updated successfully!'
+              };
+            } elseif (isset($_GET['error'])) {
+              $studyToastType = 'error';
+              $studyToastMessage = match ($_GET['error']) {
+                'missing_context' => 'Please complete the course, major, year, section, and semester filters before adding subjects.',
+                'missing_subject' => 'Select a subject code from the dropdown.',
+                'subject_missing' => 'Selected subject is not available in the catalog.',
+                'duplicate' => 'That subject is already assigned to the selected section.',
+                'invalid_major' => 'Please choose a valid major for the selected course.',
+                'invalid_semester' => 'Please choose a valid semester option.',
+                'invalid_id' => 'Invalid subject ID. Please try again.',
+                'db_error' => 'Database error occurred. Please try again or contact support.',
+                default => 'Unable to update the study load right now.'
+              };
+            }
+            ?>
+            <div class="records-container">
+              <div class="records-header">
+                <h2 class="records-title">
+                  <i class="bi bi-journal-check"></i> Customize Study Load
+                </h2>
+                <p class="records-subtitle">Link curated subjects to sections using course, major, year level, section, and semester filters.</p>
+              </div>
+              <div class="records-main">
+                <?php if (!empty($studyToastMessage)): ?>
+                  <div class="alert alert-<?php echo $studyToastType === 'error' ? 'danger' : 'success'; ?> alert-dismissible fade show" role="alert">
+                    <?php echo htmlspecialchars($studyToastMessage); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                <?php endif; ?>
+
+                <div class="info-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-123"></i>
+                    <h3>Step 1 — Select Filters</h3>
+                  </div>
+                  <form class="form-small" method="get">
+                    <input type="hidden" name="section" value="study_load" />
+                    <div class="row g-3">
+                      <div class="col-md-3">
+                        <label class="admin-form-label" for="studyCourseSelect">
+                          <i class="bi bi-mortarboard"></i> Course
+                        </label>
+                        <select id="studyCourseSelect" name="filter_course" class="form-select form-select-lg" data-course-select>
+                          <?php foreach ($courseMajorMap as $courseKey => $majorsList): ?>
+                            <option value="<?php echo $courseKey; ?>" <?php echo $selectedCourse === $courseKey ? 'selected' : ''; ?>>
+                              <?php echo $courseKey; ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="admin-form-label" for="studyMajorSelect">
+                          <i class="bi bi-diagram-3"></i> Major
+                        </label>
+                        <select id="studyMajorSelect" name="filter_major" class="form-select form-select-lg" data-major-select>
+                          <?php foreach ($courseMajorMap as $courseKey => $majorsList): ?>
+                            <?php foreach ($majorsList as $majorName): ?>
+                              <option value="<?php echo htmlspecialchars($majorName); ?>" data-course="<?php echo $courseKey; ?>" <?php echo ($selectedCourse === $courseKey && $selectedMajor === $majorName) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($majorName); ?>
+                              </option>
+                            <?php endforeach; ?>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="admin-form-label" for="studyYearFilter">
+                          <i class="bi bi-calendar-year"></i> Year Level
+                        </label>
+                        <select id="studyYearFilter" name="filter_year" class="form-select form-select-lg">
+                          <?php for ($y = 1; $y <= 4; $y++): ?>
+                            <option value="<?php echo $y; ?>" <?php echo $selectedYear === $y ? 'selected' : ''; ?>>
+                              <?php echo formatOrdinal($y); ?>
+                            </option>
+                          <?php endfor; ?>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="admin-form-label" for="studySectionFilter">
+                          <i class="bi bi-collection-fill"></i> Section
+                        </label>
+                        <select id="studySectionFilter" name="filter_section" class="form-select form-select-lg" <?php echo empty($sectionsForYear) ? 'disabled' : ''; ?>>
+                          <?php if (empty($sectionsForYear)): ?>
+                            <option value="">No sections available</option>
+                          <?php else: ?>
+                            <?php foreach ($sectionsForYear as $sectionName): ?>
+                              <option value="<?php echo htmlspecialchars($sectionName); ?>" <?php echo $selectedSection === $sectionName ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($sectionName); ?>
+                              </option>
+                            <?php endforeach; ?>
+                          <?php endif; ?>
+                        </select>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="admin-form-label" for="studySemesterFilter">
+                          <i class="bi bi-clock-history"></i> Semester
+                        </label>
+                        <select id="studySemesterFilter" name="filter_semester" class="form-select form-select-lg">
+                          <?php foreach ($semesterOptions as $semOption): ?>
+                            <option value="<?php echo htmlspecialchars($semOption); ?>" <?php echo $selectedSemester === $semOption ? 'selected' : ''; ?>>
+                              <?php echo htmlspecialchars($semOption); ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
+                      <div class="col-md-1 align-self-end">
+                        <button class="btn btn-primary btn-lg w-100" type="submit">
+                          <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                  <?php if (empty($sectionsForYear)): ?>
+                    <div class="alert alert-warning mt-3 mb-0" role="alert">
+                      Create a section for <?php echo htmlspecialchars(formatOrdinal($selectedYear)); ?> Year before assigning subjects.
+                    </div>
+                  <?php endif; ?>
+                </div>
+
+                <div class="info-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-collection"></i>
+                    <h3>Step 2 — Available Subjects</h3>
+                    <span class="badge bg-secondary ms-auto"><?php echo count($subjectsAvailable); ?> matches</span>
+                  </div>
+                  <?php if (empty($subjectsAvailable)): ?>
+                    <p class="text-muted mb-0">No subjects found for this course, major, year level, and semester. Add them under the Subject Catalog first.</p>
+                  <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                          <thead>
+                            <tr>
+                              <th>Code</th>
+                              <th>Title</th>
+                              <th>Units</th>
+                              <th>Semester</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <?php foreach ($subjectsAvailable as $subject): ?>
+                              <tr>
+                                <td><?php echo htmlspecialchars($subject['subject_code']); ?></td>
+                                <td><?php echo htmlspecialchars($subject['title']); ?></td>
+                                <td><?php echo (int)$subject['units']; ?></td>
+                                <td><?php echo htmlspecialchars($selectedSemester); ?></td>
+                              </tr>
+                            <?php endforeach; ?>
+                          </tbody>
+                        </table>
+                    </div>
+                  <?php endif; ?>
+                </div>
+
+                <?php if ($selectedSection !== '' && !empty($sectionsForYear)): ?>
+                  <div class="info-card">
+                    <div class="card-header-modern">
+                      <i class="bi bi-plus-square"></i>
+                      <h3>Step 3 — Assign Subject to <?php echo htmlspecialchars($selectedSection); ?> • <?php echo htmlspecialchars($selectedSemester); ?></h3>
+                    </div>
+                    <form class="form-small" action="/TCC/BackEnd/admin/manage_study_load.php" method="post">
+                      <input type="hidden" name="action" value="create" />
+                      <input type="hidden" name="course" value="<?php echo htmlspecialchars($selectedCourse); ?>" />
+                      <input type="hidden" name="major" value="<?php echo htmlspecialchars($selectedMajor); ?>" />
+                      <input type="hidden" name="year_level" value="<?php echo (int)$selectedYear; ?>" />
+                      <input type="hidden" name="section" value="<?php echo htmlspecialchars($selectedSection); ?>" />
+                      <input type="hidden" name="semester" value="<?php echo htmlspecialchars($selectedSemester); ?>" />
+                      <div class="row g-3 align-items-end">
+                        <div class="col-md-12">
+                          <label class="admin-form-label" for="studySubjectSelect">
+                            <i class="bi bi-upc-scan"></i> Subject Code
+                          </label>
+                          <select id="studySubjectSelect" name="subject_code" class="form-select form-select-lg" <?php echo empty($subjectsAvailable) ? 'disabled' : ''; ?> data-subject-select required>
+                            <option value="">Select subject...</option>
+                            <?php foreach ($subjectsAvailable as $subject): ?>
+                              <option value="<?php echo htmlspecialchars($subject['subject_code']); ?>" data-title="<?php echo htmlspecialchars($subject['title']); ?>" data-units="<?php echo (int)$subject['units']; ?>" data-teacher="<?php echo htmlspecialchars($subject['teacher'] ?? ''); ?>">
+                                <?php echo htmlspecialchars($subject['subject_code'] . ' — ' . $subject['title']); ?>
+                              </option>
+                            <?php endforeach; ?>
+                          </select>
+                          <input type="hidden" id="studyTeacherHidden" name="teacher" value="" />
+                          <div class="admin-hint mt-2">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Teacher will be automatically assigned based on the subject code from Teacher Management</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="mt-3 d-flex gap-2">
+                        <button class="btn btn-primary btn-lg" type="submit" <?php echo empty($subjectsAvailable) ? 'disabled' : ''; ?>>
+                          <i class="bi bi-check-circle me-2"></i>Add to Section
+                        </button>
+                        <button class="btn btn-outline-secondary btn-lg" type="reset">
+                          <i class="bi bi-arrow-counterclockwise me-2"></i>Reset
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  <div class="info-card">
+                    <div class="card-header-modern">
+                      <i class="bi bi-list-check"></i>
+                      <h3>Assigned Subjects • <?php echo htmlspecialchars($selectedSection); ?></h3>
+                      <span class="badge bg-secondary ms-auto"><?php echo $assignedTotals['subjects']; ?> subjects</span>
+                    </div>
+                    <?php if (empty($assignedSubjects)): ?>
+                      <p class="text-muted mb-0">No subjects assigned yet for this combination.</p>
+                    <?php else: ?>
+                      <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                          <thead>
+                            <tr>
+                              <th>Code</th>
+                              <th>Title</th>
+                              <th>Units</th>
+                              <th>Semester</th>
+                              <th>Teacher</th>
+                              <th style="width: 140px;">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <?php foreach ($assignedSubjects as $assigned): ?>
+                              <?php $formId = 'loadUpdate' . $assigned['id']; ?>
+                              <tr>
+                                <td><strong><?php echo htmlspecialchars($assigned['subject_code']); ?></strong></td>
+                                <td><?php echo htmlspecialchars($assigned['subject_title']); ?></td>
+                                <td><?php echo (int)$assigned['units']; ?></td>
+                                <td><?php echo htmlspecialchars($assigned['semester'] ?? $selectedSemester); ?></td>
+                                <td>
+                                  <form id="<?php echo $formId; ?>" action="/TCC/BackEnd/admin/manage_study_load.php" method="post" class="d-flex gap-2 align-items-center">
+                                    <input type="hidden" name="action" value="update" />
+                                    <input type="hidden" name="id" value="<?php echo (int)$assigned['id']; ?>" />
+                                    <input type="hidden" name="course" value="<?php echo htmlspecialchars($selectedCourse); ?>" />
+                                    <input type="hidden" name="major" value="<?php echo htmlspecialchars($selectedMajor); ?>" />
+                                    <input type="hidden" name="year_level" value="<?php echo (int)$selectedYear; ?>" />
+                                    <input type="hidden" name="section" value="<?php echo htmlspecialchars($selectedSection); ?>" />
+                                    <input type="hidden" name="subject_code" value="<?php echo htmlspecialchars($assigned['subject_code']); ?>" />
+                                    <input type="hidden" name="semester" value="<?php echo htmlspecialchars($assigned['semester'] ?? $selectedSemester); ?>" />
+                                    <input name="teacher" class="form-control form-control-sm" placeholder="Subject Teacher" value="<?php echo htmlspecialchars($assigned['teacher'] ?? ''); ?>" />
+                                  </form>
+                                </td>
+                                <td class="text-nowrap">
+                                  <button type="submit" class="btn btn-sm btn-primary me-2" form="<?php echo $formId; ?>" title="Save Teacher">
+                                    <i class="bi bi-save"></i>
+                                  </button>
+                                  <form method="post" action="/TCC/BackEnd/admin/manage_study_load.php" class="d-inline" onsubmit="return confirm('Remove <?php echo htmlspecialchars($assigned['subject_code']); ?> from this section?');">
+                                    <input type="hidden" name="action" value="delete" />
+                                    <input type="hidden" name="id" value="<?php echo (int)$assigned['id']; ?>" />
+                                    <input type="hidden" name="course" value="<?php echo htmlspecialchars($selectedCourse); ?>" />
+                                    <input type="hidden" name="major" value="<?php echo htmlspecialchars($selectedMajor); ?>" />
+                                    <input type="hidden" name="year_level" value="<?php echo (int)$selectedYear; ?>" />
+                                    <input type="hidden" name="section" value="<?php echo htmlspecialchars($selectedSection); ?>" />
+                                    <input type="hidden" name="semester" value="<?php echo htmlspecialchars($assigned['semester'] ?? $selectedSemester); ?>" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Subject">
+                                      <i class="bi bi-trash"></i>
+                                    </button>
+                                  </form>
+                                </td>
+                              </tr>
+                            <?php endforeach; ?>
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <th colspan="3">Total Subjects: <?php echo $assignedTotals['subjects']; ?></th>
+                              <th colspan="3">Total Units: <?php echo $assignedTotals['units']; ?></th>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
           <?php elseif ($section === 'grade_system'): ?>
             <?php
             require_once __DIR__ . '/../BackEnd/database/db.php';
@@ -2978,6 +4079,400 @@ if (empty($schoolId)) {
 
           <?php // end settings block ?>
 
+          <?php if ($section === 'manage_user'): ?>
+            <?php
+            require_once __DIR__ . '/../BackEnd/database/db.php';
+            $conn = Database::getInstance()->getConnection();
+
+            $userToastMessage = '';
+            $userToastType = 'success';
+            if (isset($_GET['success'])) {
+              $userToastMessage = match ($_GET['success']) {
+                'updated' => 'User role updated successfully!',
+                default => 'User updated successfully!'
+              };
+            } elseif (isset($_GET['error'])) {
+              $userToastType = 'error';
+              $userToastMessage = match ($_GET['error']) {
+                'missing' => 'Please select a user and role.',
+                'invalid_id' => 'Invalid user ID.',
+                'invalid_role' => 'Invalid role selected.',
+                'db_error' => 'Database error occurred. Please try again.',
+                'self_demote' => 'You cannot change your own role.',
+                default => 'Unable to update user role right now.'
+              };
+            }
+
+            $users = [];
+            $stmt = $conn->prepare("SELECT id, username, full_name, role, school_id, image_path, created_at FROM users ORDER BY created_at DESC");
+            if ($stmt) {
+              $stmt->execute();
+              $result = $stmt->get_result();
+              while ($row = $result->fetch_assoc()) {
+                $users[] = $row;
+              }
+              $stmt->close();
+            }
+            ?>
+            <div class="records-container">
+              <div class="records-header">
+                <h2 class="records-title">
+                  <i class="bi bi-person-gear"></i> Manage User Roles
+                </h2>
+                <p class="records-subtitle">Set user roles (Student, Admin, or Teacher) for all users in the system.</p>
+              </div>
+              <div class="records-main">
+                <?php if (!empty($userToastMessage)): ?>
+                  <div class="alert alert-<?php echo $userToastType === 'error' ? 'danger' : 'success'; ?> alert-dismissible fade show" role="alert">
+                    <?php echo htmlspecialchars($userToastMessage); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                <?php endif; ?>
+
+                <div class="info-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-people"></i>
+                    <h3>All Users</h3>
+                    <span class="badge bg-secondary ms-auto"><?php echo count($users); ?> total</span>
+                  </div>
+                  <?php if (empty($users)): ?>
+                    <p class="text-muted mb-0">No users found in the system.</p>
+                  <?php else: ?>
+                    <div class="table-responsive">
+                      <table class="table table-hover align-middle">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Full Name</th>
+                            <th>School ID</th>
+                            <th>Current Role</th>
+                            <th>Change Role</th>
+                            <th>Created</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <?php foreach ($users as $user): ?>
+                            <?php $formId = 'roleForm' . $user['id']; ?>
+                            <tr>
+                              <td><?php echo (int)$user['id']; ?></td>
+                              <td><strong><?php echo htmlspecialchars($user['username']); ?></strong></td>
+                              <td><?php echo htmlspecialchars($user['full_name'] ?? '—'); ?></td>
+                              <td><?php echo htmlspecialchars($user['school_id'] ?? '—'); ?></td>
+                              <td>
+                                <span class="badge bg-<?php 
+                                  echo $user['role'] === 'admin' ? 'danger' : ($user['role'] === 'teacher' ? 'warning' : 'info'); 
+                                ?>">
+                                  <?php echo htmlspecialchars(ucfirst($user['role'])); ?>
+                                </span>
+                              </td>
+                              <td>
+                                <form id="<?php echo $formId; ?>" action="/TCC/BackEnd/admin/manage_user_role.php" method="post" class="d-flex gap-2 align-items-center">
+                                  <input type="hidden" name="action" value="update_role" />
+                                  <input type="hidden" name="user_id" value="<?php echo (int)$user['id']; ?>" />
+                                  <select name="role" class="form-select form-select-sm" style="width: auto; min-width: 120px;">
+                                    <option value="student" <?php echo $user['role'] === 'student' ? 'selected' : ''; ?>>Student</option>
+                                    <option value="teacher" <?php echo $user['role'] === 'teacher' ? 'selected' : ''; ?>>Teacher</option>
+                                    <option value="admin" <?php echo $user['role'] === 'admin' ? 'selected' : ''; ?>>Admin</option>
+                                  </select>
+                                  <button type="submit" class="btn btn-sm btn-primary" title="Update Role">
+                                    <i class="bi bi-save"></i>
+                                  </button>
+                                </form>
+                              </td>
+                              <td class="text-muted small">
+                                <?php 
+                                  if ($user['created_at']) {
+                                    $date = new DateTime($user['created_at']);
+                                    echo $date->format('M d, Y');
+                                  } else {
+                                    echo '—';
+                                  }
+                                ?>
+                              </td>
+                            </tr>
+                          <?php endforeach; ?>
+                        </tbody>
+                      </table>
+                    </div>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </div>
+          <?php endif; ?>
+
+          <?php if ($section === 'teacher_management'): ?>
+            <?php
+            require_once __DIR__ . '/../BackEnd/database/db.php';
+            $conn = Database::getInstance()->getConnection();
+            
+            // Ensure schedules table has class_type column
+            try {
+              $colCheck = $conn->query("SHOW COLUMNS FROM schedules LIKE 'class_type'");
+              if ($colCheck && $colCheck->num_rows === 0) {
+                $conn->query("ALTER TABLE schedules ADD COLUMN class_type ENUM('day', 'night') DEFAULT 'day' AFTER building");
+              }
+              if ($colCheck) { $colCheck->close(); }
+            } catch (Throwable $th) {
+              // ignore
+            }
+            
+            $teacherToastMessage = '';
+            $teacherToastType = 'success';
+            if (isset($_GET['success'])) {
+              $teacherToastMessage = match ($_GET['success']) {
+                'created' => 'Teacher schedule created successfully!',
+                'updated' => 'Teacher schedule updated successfully!',
+                'deleted' => 'Teacher schedule deleted successfully!',
+                default => 'Teacher schedule saved successfully!'
+              };
+            } elseif (isset($_GET['error'])) {
+              $teacherToastType = 'error';
+              $teacherToastMessage = match ($_GET['error']) {
+                'missing' => 'Please fill in all required fields.',
+                'invalid_id' => 'Invalid schedule ID.',
+                'db_error' => 'Database error occurred. Please try again.',
+                default => 'Unable to save schedule right now.'
+              };
+            }
+            
+            // Get all teachers from multiple sources
+            $allTeacherNames = [];
+            
+            // 1. Get teachers from teacher_assignments table (new system)
+            $colCheck = $conn->query("SHOW COLUMNS FROM teacher_assignments LIKE 'teacher_name'");
+            $hasNewSchema = $colCheck && $colCheck->num_rows > 0;
+            if ($colCheck) { $colCheck->close(); }
+            
+            if ($hasNewSchema) {
+              $taQuery = $conn->query("SELECT DISTINCT teacher_name FROM teacher_assignments WHERE teacher_name IS NOT NULL AND teacher_name <> '' ORDER BY teacher_name");
+              if ($taQuery) {
+                while ($row = $taQuery->fetch_assoc()) {
+                  $teacherName = trim($row['teacher_name']);
+                  if ($teacherName !== '' && !in_array($teacherName, $allTeacherNames)) {
+                    $allTeacherNames[] = $teacherName;
+                  }
+                }
+              }
+            } else {
+              // Old schema
+              $taQuery = $conn->query("SELECT DISTINCT username as teacher_name FROM teacher_assignments WHERE username IS NOT NULL AND username <> '' ORDER BY username");
+              if ($taQuery) {
+                while ($row = $taQuery->fetch_assoc()) {
+                  $teacherName = trim($row['teacher_name']);
+                  if ($teacherName !== '' && !in_array($teacherName, $allTeacherNames)) {
+                    $allTeacherNames[] = $teacherName;
+                  }
+                }
+              }
+            }
+            
+            // 2. Get teachers from schedules table
+            $teachers = [];
+            $teachersQuery = $conn->query("SELECT DISTINCT instructor FROM schedules WHERE instructor IS NOT NULL AND instructor <> '' ORDER BY instructor");
+            if ($teachersQuery) {
+              while ($row = $teachersQuery->fetch_assoc()) {
+                $teacherName = trim($row['instructor']);
+                if ($teacherName !== '' && !in_array($teacherName, $allTeacherNames)) {
+                  $allTeacherNames[] = $teacherName;
+                  $teachers[] = $teacherName;
+                }
+              }
+            }
+            
+            // 3. Get all users with teacher role
+            $teacherUsers = [];
+            $teacherUsersQuery = $conn->query("SELECT id, username, full_name FROM users WHERE role = 'teacher' ORDER BY full_name, username");
+            if ($teacherUsersQuery) {
+              while ($row = $teacherUsersQuery->fetch_assoc()) {
+                $teacherUsers[] = $row;
+                $teacherDisplay = trim($row['full_name'] ?? '');
+                if ($teacherDisplay === '') {
+                  $teacherDisplay = $row['username'] ?? '';
+                }
+                if ($teacherDisplay !== '' && !in_array($teacherDisplay, $allTeacherNames)) {
+                  $allTeacherNames[] = $teacherDisplay;
+                }
+              }
+            }
+            
+            // Sort all teacher names
+            sort($allTeacherNames);
+            
+            // Get schedules for selected teacher
+            $selectedTeacher = isset($_GET['filter_teacher']) ? trim($_GET['filter_teacher']) : '';
+            $teacherSchedules = [];
+            if ($selectedTeacher !== '') {
+              $schedStmt = $conn->prepare("SELECT id, year, subject, day, time_start, time_end, room, section, building, class_type, instructor FROM schedules WHERE instructor = ? ORDER BY FIELD(day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'), time_start");
+              if ($schedStmt) {
+                $schedStmt->bind_param('s', $selectedTeacher);
+                $schedStmt->execute();
+                $schedRes = $schedStmt->get_result();
+                while ($row = $schedRes->fetch_assoc()) {
+                  $teacherSchedules[] = $row;
+                }
+                $schedStmt->close();
+              }
+            }
+            
+            // Get available sections and buildings
+            $availableSections = [];
+            $sectionsQuery = $conn->query("SELECT DISTINCT name FROM sections ORDER BY name");
+            if ($sectionsQuery) {
+              while ($row = $sectionsQuery->fetch_assoc()) {
+                $availableSections[] = $row['name'];
+              }
+            }
+            
+            $availableBuildings = [];
+            $buildingsQuery = $conn->query("SELECT name FROM buildings ORDER BY name");
+            if ($buildingsQuery) {
+              while ($row = $buildingsQuery->fetch_assoc()) {
+                $availableBuildings[] = $row['name'];
+              }
+            }
+            if (empty($availableBuildings)) {
+              $buildingsPath = __DIR__ . '/../database/buildings.json';
+              if (file_exists($buildingsPath)) {
+                $buildingsData = json_decode(file_get_contents($buildingsPath), true) ?: [];
+                $availableBuildings = array_keys($buildingsData);
+              }
+            }
+            ?>
+            <div class="records-container">
+              <div class="records-header">
+                <h2 class="records-title">
+                  <i class="bi bi-person-badge"></i> Teacher Management
+                </h2>
+                <p class="records-subtitle">View and manage teacher schedules and assignments</p>
+              </div>
+              <div class="records-main">
+                <?php if (!empty($teacherToastMessage)): ?>
+                  <div class="alert alert-<?php echo $teacherToastType === 'error' ? 'danger' : 'success'; ?> alert-dismissible fade show" role="alert">
+                    <?php echo htmlspecialchars($teacherToastMessage); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                <?php endif; ?>
+                
+                <div class="info-card">
+                  <div class="card-header-modern">
+                    <i class="bi bi-funnel"></i>
+                    <h3>Filter by Teacher</h3>
+                  </div>
+                  <form method="get" class="form-small">
+                    <input type="hidden" name="section" value="teacher_management" />
+                    <div class="row g-3">
+                      <div class="col-md-8">
+                        <label class="admin-form-label" for="teacherFilterSelect">
+                          <i class="bi bi-person-badge"></i> Select Teacher
+                        </label>
+                        <select id="teacherFilterSelect" name="filter_teacher" class="form-select form-select-lg" onchange="this.form.submit()">
+                          <option value="">Select a teacher...</option>
+                          <?php foreach ($allTeacherNames as $teacherName): ?>
+                            <option value="<?php echo htmlspecialchars($teacherName); ?>" <?php echo $selectedTeacher === $teacherName ? 'selected' : ''; ?>>
+                              <?php echo htmlspecialchars($teacherName); ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
+                      <div class="col-md-4 align-self-end">
+                        <?php if ($selectedTeacher !== ''): ?>
+                          <a href="/TCC/public/admin_dashboard.php?section=teacher_management" class="btn btn-outline-secondary btn-lg w-100">
+                            <i class="bi bi-x-circle me-2"></i>Clear Filter
+                          </a>
+                        <?php endif; ?>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+                
+                <?php if ($selectedTeacher !== ''): ?>
+                  <div class="info-card mt-3">
+                    <div class="card-header-modern">
+                      <i class="bi bi-calendar-week"></i>
+                      <h3>Schedule for <?php echo htmlspecialchars($selectedTeacher); ?></h3>
+                      <span class="badge bg-secondary ms-auto"><?php echo count($teacherSchedules); ?> classes</span>
+                    </div>
+                    <?php if (empty($teacherSchedules)): ?>
+                      <p class="text-muted mb-0">No schedules found for this teacher.</p>
+                    <?php else: ?>
+                      <?php
+                      // Group schedules by day
+                      $schedulesByDay = [];
+                      foreach ($teacherSchedules as $schedule) {
+                        $day = $schedule['day'] ?? 'Unknown';
+                        if (!isset($schedulesByDay[$day])) {
+                          $schedulesByDay[$day] = [];
+                        }
+                        $schedulesByDay[$day][] = $schedule;
+                      }
+                      
+                      $teacherDayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                      uksort($schedulesByDay, function($a, $b) use ($teacherDayOrder) {
+                        $posA = array_search($a, $teacherDayOrder);
+                        $posB = array_search($b, $teacherDayOrder);
+                        if ($posA === false) $posA = 999;
+                        if ($posB === false) $posB = 999;
+                        return $posA - $posB;
+                      });
+                      ?>
+                      <?php foreach ($schedulesByDay as $day => $daySchedules): ?>
+                        <div class="mt-3">
+                          <h5 class="mb-3"><i class="bi bi-calendar-day"></i> <?php echo htmlspecialchars($day); ?></h5>
+                          <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                              <thead>
+                                <tr>
+                                  <th>Subject</th>
+                                  <th>Year</th>
+                                  <th>Section</th>
+                                  <th>Time</th>
+                                  <th>Class Type</th>
+                                  <th>Room</th>
+                                  <th>Building</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <?php foreach ($daySchedules as $schedule): 
+                                  $timeStart = date('g:i A', strtotime($schedule['time_start']));
+                                  $timeEnd = date('g:i A', strtotime($schedule['time_end']));
+                                  $timeRange = $timeStart . ' - ' . $timeEnd;
+                                  $classType = $schedule['class_type'] ?? 'day';
+                                ?>
+                                  <tr>
+                                    <td><strong><?php echo htmlspecialchars($schedule['subject']); ?></strong></td>
+                                    <td><?php echo htmlspecialchars($schedule['year'] ?? 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars($schedule['section'] ?? '—'); ?></td>
+                                    <td><?php echo htmlspecialchars($timeRange); ?></td>
+                                    <td>
+                                      <span class="badge bg-<?php echo $classType === 'night' ? 'dark' : 'warning'; ?>">
+                                        <?php echo htmlspecialchars(ucfirst($classType)); ?>
+                                      </span>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($schedule['room'] ?? '—'); ?></td>
+                                    <td><?php echo htmlspecialchars($schedule['building'] ?? '—'); ?></td>
+                                  </tr>
+                                <?php endforeach; ?>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </div>
+                <?php else: ?>
+                  <div class="info-card mt-3">
+                    <div class="card-header-modern">
+                      <i class="bi bi-info-circle"></i>
+                      <h3>Select a Teacher</h3>
+                    </div>
+                    <p class="text-muted mb-0">Select a teacher from the dropdown above to view their schedule.</p>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+          <?php endif; ?>
+
           <?php if ($section === 'settings'): ?>
             <?php include __DIR__ . '/../BackEnd/admin/settings_section.php'; ?>
           <?php endif; ?>
@@ -3115,6 +4610,37 @@ if (empty($schoolId)) {
           gradeSystemWrapper.style.zIndex = '1';
         }
         
+        // Auto-populate teacher when subject is selected in study load
+        var studySubjectSelect = document.getElementById('studySubjectSelect');
+        var studyTeacherHidden = document.getElementById('studyTeacherHidden');
+        if (studySubjectSelect && studyTeacherHidden) {
+          studySubjectSelect.addEventListener('change', function() {
+            var selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+              var teacher = selectedOption.getAttribute('data-teacher') || '';
+              studyTeacherHidden.value = teacher;
+              if (teacher) {
+                // Show a visual indicator that teacher was auto-filled
+                var hint = this.parentElement.querySelector('.admin-hint');
+                if (hint) {
+                  hint.innerHTML = '<i class="bi bi-check-circle text-success"></i> <span>Teacher automatically assigned: <strong>' + teacher + '</strong></span>';
+                }
+              } else {
+                var hint = this.parentElement.querySelector('.admin-hint');
+                if (hint) {
+                  hint.innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> <span>No teacher assigned for this subject. Please add a teacher in Teacher Management first.</span>';
+                }
+              }
+            } else {
+              studyTeacherHidden.value = '';
+              var hint = this.parentElement.querySelector('.admin-hint');
+              if (hint) {
+                hint.innerHTML = '<i class="bi bi-info-circle"></i> <span>Teacher will be automatically assigned based on the subject code from Teacher Management</span>';
+              }
+            }
+          });
+        }
+        
         // Ensure all student grade cards are properly styled
         var studentCards = document.querySelectorAll('.student-grade-card');
         studentCards.forEach(function(card) {
@@ -3129,7 +4655,7 @@ if (empty($schoolId)) {
         <?php endif; ?>
         
         // Attach scroll position saving to all forms that redirect
-        const forms = document.querySelectorAll('form[action*="manage_section_assignments"], form[action*="manage_buildings"], form[action*="manage_users"], form[action*="delete_announcement"], form[action*="manage_grades"], form[action*="manage_sections"], form[action*="manage_schedules"]');
+        const forms = document.querySelectorAll('form[action*="manage_section_assignments"], form[action*="manage_buildings"], form[action*="manage_users"], form[action*="delete_announcement"], form[action*="manage_grades"], form[action*="manage_sections"], form[action*="manage_schedules"], form[action*="manage_subjects"], form[action*="manage_study_load"]');
         forms.forEach(form => {
           form.addEventListener('submit', function() {
             saveScrollPosition();
@@ -3146,6 +4672,7 @@ if (empty($schoolId)) {
             var payment = button.getAttribute('data-payment') || 'paid';
             var sanctions = button.getAttribute('data-sanctions') || '';
             var department = button.getAttribute('data-department') || '';
+            var major = button.getAttribute('data-major') || '';
             var owing = button.getAttribute('data-owing') || '';
 
             // display full name and set hidden input
@@ -3157,11 +4684,21 @@ if (empty($schoolId)) {
             var paymentEl = document.getElementById('modalPayment');
             var sanctionsEl = document.getElementById('modalSanctions');
             var deptEl = document.getElementById('modalDepartment');
+            var majorEl = document.getElementById('modalMajor');
             var owingEl = document.getElementById('modalOwingAmount');
             var owingRow = document.getElementById('owingRow');
             if (paymentEl) paymentEl.value = payment;
             if (sanctionsEl) sanctionsEl.value = sanctions;
-            if (deptEl) deptEl.value = department;
+            if (majorEl) {
+              majorEl.setAttribute('data-selected', major);
+            }
+            if (deptEl) {
+              deptEl.value = department;
+              deptEl.dispatchEvent(new Event('change'));
+            }
+            if (majorEl && major !== '') {
+              majorEl.value = major;
+            }
             if (owingEl) owingEl.value = owing;
 
             if (owingRow) {
@@ -3381,8 +4918,102 @@ if (empty($schoolId)) {
           }
         })();
         
+        // Course/Major dependent dropdowns
+        const courseMajorConfig = <?php echo json_encode($courseMajorMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+        function refreshMajorOptions(courseSelect, majorSelect) {
+          if (!courseSelect || !majorSelect) return;
+          const course = courseSelect.value;
+          const majors = courseMajorConfig[course] || [];
+          const presetValue = majorSelect.getAttribute('data-selected');
+          const currentValue = (presetValue !== null && presetValue !== '') ? presetValue : majorSelect.value;
+          majorSelect.innerHTML = '<option value="">Select major...</option>';
+          let matched = false;
+          majors.forEach(function(major){
+            const opt = document.createElement('option');
+            opt.value = major;
+            opt.textContent = major;
+            if (!matched && currentValue === major) {
+              opt.selected = true;
+              matched = true;
+            }
+            majorSelect.appendChild(opt);
+          });
+          if (!matched && majors.length > 0) {
+            majorSelect.selectedIndex = 1;
+          }
+          if (presetValue !== null) {
+            majorSelect.removeAttribute('data-selected');
+          }
+          majorSelect.disabled = majors.length === 0;
+          if (majors.length === 0) {
+            majorSelect.value = '';
+          }
+        }
+        document.querySelectorAll('[data-course-select]').forEach(function(courseSelect){
+          const parent = courseSelect.closest('form') || document;
+          const majorSelect = parent.querySelector('[data-major-select]');
+          if (!majorSelect) return;
+          refreshMajorOptions(courseSelect, majorSelect);
+          courseSelect.addEventListener('change', function(){
+            refreshMajorOptions(courseSelect, majorSelect);
+          });
+        });
+
+        // Auto-submit study load filter form when filters change
+        (function(){
+          const sectionInput = document.querySelector('form[method="get"] input[name="section"][value="study_load"]');
+          if (sectionInput) {
+            const filterForm = sectionInput.closest('form');
+            if (filterForm) {
+              const filterSelects = filterForm.querySelectorAll('select[name^="filter_"]');
+              filterSelects.forEach(function(select) {
+                select.addEventListener('change', function() {
+                  filterForm.submit();
+                });
+              });
+            }
+          }
+        })();
+
+        // Subject select is now simplified - no preview needed
+        
+        // Add form validation for teacher assignment form
+        var assignTeacherForm = document.getElementById('assignTeacherForm');
+        if (assignTeacherForm) {
+          // Update hidden user_id field when teacher is selected from dropdown
+          var teacherSelect = document.getElementById('teacherFullName');
+          var teacherUserIdHidden = document.getElementById('teacherUserIdHidden');
+          if (teacherSelect && teacherUserIdHidden) {
+            teacherSelect.addEventListener('change', function() {
+              var selectedOption = this.options[this.selectedIndex];
+              var userId = selectedOption.getAttribute('data-user-id') || '';
+              teacherUserIdHidden.value = userId;
+            });
+          }
+          
+          assignTeacherForm.addEventListener('submit', function(e) {
+            var fullName = document.getElementById('teacherFullName');
+            var subjectCode = document.getElementById('teacherSubjectCode');
+            
+            if (!fullName || !fullName.value.trim()) {
+              e.preventDefault();
+              alert('Please select a teacher.');
+              if (fullName) fullName.focus();
+              return false;
+            }
+            
+            if (!subjectCode || !subjectCode.value) {
+              e.preventDefault();
+              alert('Please select a subject from the dropdown.');
+              if (subjectCode) subjectCode.focus();
+              return false;
+            }
+            
+            return true;
+          });
+        }
+        
       });
     </script>
   </body>
 </html>
-

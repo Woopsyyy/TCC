@@ -295,6 +295,31 @@ body::before {
   display: grid;
   gap: 28px;
 }
+
+.study-load-card .study-load-title {
+  letter-spacing: 0.2rem;
+  font-weight: 700;
+}
+
+.study-load-subheader {
+  background: rgba(47, 41, 38, 0.05);
+  letter-spacing: 0.15rem;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.study-load-table th,
+.study-load-table td {
+  vertical-align: middle;
+}
+
+.study-load-total-row {
+  background: rgba(132, 129, 112, 0.08);
+}
+
+.study-load-table-wrapper {
+  margin-top: 1rem;
+}
 /* Sidebar styles moved to home_sidebar.css */
 .announcement-card .card-title {
   font-size: 1.125rem;
