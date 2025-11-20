@@ -14,5 +14,9 @@
     "D": {
         "floors": 4,
         "rooms": 4
+    },
+    "GSR": {
+        "floors": 1,
+        "rooms": 2
     }
 }

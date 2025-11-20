@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../helpers/admin_helpers.php';
-require_admin_post('/TCC/public/admin_dashboard.php?section=schedule_management');
+$fromSection = $_POST['from_section'] ?? 'schedule_management';
+$redirectBase = '/TCC/public/admin_dashboard.php?section=' . $fromSection;
+require_admin_post($redirectBase);
 
 require_once __DIR__ . '/../database/db.php';
 $conn = Database::getInstance()->getConnection();
@@ -17,6 +19,7 @@ ensure_tables($conn, [
     instructor VARCHAR(255) DEFAULT NULL,
     section VARCHAR(100) DEFAULT NULL,
     building VARCHAR(10) DEFAULT NULL,
+    class_type ENUM('day', 'night') DEFAULT 'day',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_year (year),
@@ -49,19 +52,32 @@ ensure_tables($conn, [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
 ]);
 
+// Ensure class_type column exists
+$colCheck = $conn->query("SHOW COLUMNS FROM schedules LIKE 'class_type'");
+if ($colCheck && $colCheck->num_rows === 0) {
+  $conn->query("ALTER TABLE schedules ADD COLUMN class_type ENUM('day', 'night') DEFAULT 'day' AFTER building");
+}
+if ($colCheck) { $colCheck->close(); }
+
 $action = $_POST['action'] ?? 'create';
+
+function redirect_schedule(string $query): void {
+  global $redirectBase;
+  header('Location: ' . $redirectBase . '&' . $query);
+  exit();
+}
 
 if ($action === 'delete') {
 	// Delete schedule
 	$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-	if ($id <= 0) { header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&error=invalid_id'); exit(); }
+	if ($id <= 0) { redirect_schedule('error=invalid_id'); }
 	
 	// Get schedule info for audit log
 	$sel = $conn->prepare("SELECT year, subject, day FROM schedules WHERE id = ? LIMIT 1");
 	$sel->bind_param('i', $id);
 	$sel->execute();
 	$res = $sel->get_result();
-	$row = $sel->fetch_assoc();
+	$row = $res->fetch_assoc();
 	$sel->close();
 	
 	if ($row) {
@@ -74,8 +90,7 @@ if ($action === 'delete') {
 		log_audit($conn, 'delete', 'schedules', $id, $details);
 	}
 	
-	header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&success=deleted');
-	exit();
+	redirect_schedule('success=deleted');
 }
 
 // Validate required fields
@@ -86,36 +101,50 @@ $timeStart = trim($_POST['time_start'] ?? '');
 $timeEnd = trim($_POST['time_end'] ?? '');
 
 if (empty($year) || empty($subject) || empty($day) || empty($timeStart) || empty($timeEnd)) {
-	header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&error=missing');
-	exit();
+	redirect_schedule('error=missing');
 }
 
 $room = trim($_POST['room'] ?? '');
 $instructor = trim($_POST['instructor'] ?? '');
 $section = trim($_POST['section'] ?? '');
 $building = trim($_POST['building'] ?? '');
+$classType = strtolower(trim($_POST['class_type'] ?? 'day'));
+$validClassTypes = ['day', 'night'];
+if (!in_array($classType, $validClassTypes, true)) {
+	$classType = 'day';
+}
 
-// Validate Instructor if provided
-if (!empty($instructor)) {
-	// Check if instructor exists in teacher_assignments table
-	$instructorCheck1 = $conn->prepare("SELECT COUNT(*) as cnt FROM teacher_assignments WHERE username = ?");
-	$instructorCheck1->bind_param('s', $instructor);
-	$instructorCheck1->execute();
-	$instructorRes1 = $instructorCheck1->get_result();
-	$instructorRow1 = $instructorCheck1->fetch_assoc();
-	$instructorCheck1->close();
+// Auto-find instructor from teacher_assignments based on subject code
+// If instructor is not provided, look it up from teacher_assignments
+if (empty($instructor) && !empty($subject)) {
+	$teacherLookup = $conn->prepare("SELECT teacher_name FROM teacher_assignments WHERE subject_code = ? LIMIT 1");
+	if ($teacherLookup) {
+		$teacherLookup->bind_param('s', $subject);
+		$teacherLookup->execute();
+		$teacherResult = $teacherLookup->get_result();
+		if ($teacherRow = $teacherResult->fetch_assoc()) {
+			$instructor = $teacherRow['teacher_name'];
+		}
+		$teacherLookup->close();
+	}
+}
+
+// Validate Instructor - must exist in teacher_assignments for the subject
+if (empty($instructor)) {
+	redirect_schedule('error=instructor_not_found');
+}
+
+// Verify the instructor is actually assigned to this subject
+$instructorVerify = $conn->prepare("SELECT COUNT(*) as cnt FROM teacher_assignments WHERE subject_code = ? AND teacher_name = ?");
+if ($instructorVerify) {
+	$instructorVerify->bind_param('ss', $subject, $instructor);
+	$instructorVerify->execute();
+	$instructorVerifyRes = $instructorVerify->get_result();
+	$instructorVerifyRow = $instructorVerifyRes->fetch_assoc();
+	$instructorVerify->close();
 	
-	// Also check users table directly for teachers
-	$userCheck = $conn->prepare("SELECT COUNT(*) as cnt FROM users WHERE (full_name = ? OR username = ?) AND role = 'teacher'");
-	$userCheck->bind_param('ss', $instructor, $instructor);
-	$userCheck->execute();
-	$userRes = $userCheck->get_result();
-	$userRow = $userCheck->fetch_assoc();
-	$userCheck->close();
-	
-	if (intval($instructorRow1['cnt'] ?? 0) === 0 && intval($userRow['cnt'] ?? 0) === 0) {
-		header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&error=instructor_not_found');
-		exit();
+	if (intval($instructorVerifyRow['cnt'] ?? 0) === 0) {
+		redirect_schedule('error=instructor_not_found');
 	}
 }
 
@@ -125,12 +154,11 @@ if (!empty($section)) {
 	$sectionCheck->bind_param('ss', $year, $section);
 	$sectionCheck->execute();
 	$sectionRes = $sectionCheck->get_result();
-	$sectionRow = $sectionCheck->fetch_assoc();
+	$sectionRow = $sectionRes->fetch_assoc();
 	$sectionCheck->close();
 	
 	if (intval($sectionRow['cnt'] ?? 0) === 0) {
-		header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&error=section_not_found');
-		exit();
+		redirect_schedule('error=section_not_found');
 	}
 }
 
@@ -141,7 +169,7 @@ if (!empty($building)) {
 	$buildingCheck->bind_param('s', $building);
 	$buildingCheck->execute();
 	$buildingRes = $buildingCheck->get_result();
-	$buildingRow = $buildingCheck->fetch_assoc();
+	$buildingRow = $buildingRes->fetch_assoc();
 	$buildingCheck->close();
 	
 	// Also check JSON fallback
@@ -157,37 +185,46 @@ if (!empty($building)) {
 	}
 	
 	if (!$buildingExists) {
-		header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&error=building_not_found');
-		exit();
+		redirect_schedule('error=building_not_found');
 	}
 }
 
 if ($action === 'update') {
 	$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-	if ($id <= 0) { header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&error=invalid_id'); exit(); }
+	if ($id <= 0) { redirect_schedule('error=invalid_id'); }
 	
-	$upd = $conn->prepare("UPDATE schedules SET year = ?, subject = ?, day = ?, time_start = ?, time_end = ?, room = ?, instructor = ?, section = ?, building = ? WHERE id = ?");
-	$upd->bind_param('sssssssssi', $year, $subject, $day, $timeStart, $timeEnd, $room, $instructor, $section, $building, $id);
-	$upd->execute();
+	$upd = $conn->prepare("UPDATE schedules SET year = ?, subject = ?, day = ?, time_start = ?, time_end = ?, room = ?, instructor = ?, section = ?, building = ?, class_type = ? WHERE id = ?");
+	if (!$upd) {
+		redirect_schedule('error=db_error');
+	}
+	$upd->bind_param('ssssssssssi', $year, $subject, $day, $timeStart, $timeEnd, $room, $instructor, $section, $building, $classType, $id);
+	if (!$upd->execute()) {
+		$upd->close();
+		redirect_schedule('error=db_error');
+	}
 	$upd->close();
 	
 	$details = "Updated schedule: " . $subject . " - " . $day . " (" . $year . ")";
 	log_audit($conn, 'update', 'schedules', $id, $details);
 	
-	header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&success=updated');
-	exit();
+	redirect_schedule('success=updated');
 } else {
 	// Create new schedule
-	$ins = $conn->prepare("INSERT INTO schedules (year, subject, day, time_start, time_end, room, instructor, section, building) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-	$ins->bind_param('sssssssss', $year, $subject, $day, $timeStart, $timeEnd, $room, $instructor, $section, $building);
-	$ins->execute();
+	$ins = $conn->prepare("INSERT INTO schedules (year, subject, day, time_start, time_end, room, instructor, section, building, class_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+	if (!$ins) {
+		redirect_schedule('error=db_error');
+	}
+	$ins->bind_param('ssssssssss', $year, $subject, $day, $timeStart, $timeEnd, $room, $instructor, $section, $building, $classType);
+	if (!$ins->execute()) {
+		$ins->close();
+		redirect_schedule('error=db_error');
+	}
 	$newId = $conn->insert_id;
 	$ins->close();
 	
 	$details = "Created schedule: " . $subject . " - " . $day . " (" . $year . ")";
 	log_audit($conn, 'create', 'schedules', $newId, $details);
 	
-	header('Location: /TCC/public/admin_dashboard.php?section=schedule_management&success=created');
-	exit();
+	redirect_schedule('success=created');
 }
 ?>

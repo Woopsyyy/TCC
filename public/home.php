@@ -157,6 +157,13 @@ function formatOrdinal($number) {
             'spotlight_copy' => 'Update your username, display name, password, and profile picture to keep your account up to date.'
           ],
         ];
+$departmentMajors = [
+  'IT' => ['Computer Technology', 'Electronics'],
+  'BSED' => ['English', 'Physical Education', 'Math', 'Filipino', 'Social Science'],
+  'HM' => ['General'],
+  'BEED' => ['General'],
+  'TOURISM' => ['General']
+];
         $activeSpotlight = $heroSpotlights[$view] ?? $heroSpotlights['records'];
         ?>
         <section class="dashboard-hero">
@@ -648,13 +655,172 @@ function formatOrdinal($number) {
             </div>
             <div class="records-main">
               <?php
+              $currentUserId = $_SESSION['user_id'] ?? null;
+              $currentUsername = $_SESSION['username'] ?? '';
+              $currentFullName = $_SESSION['full_name'] ?? '';
+              $studentGrades = [];
+
+              $studyLoadMeta = [
+                'studentId' => !empty($schoolId) ? $schoolId : 'Not set',
+                'fullName' => $full_name ?? $currentUsername,
+                'course' => 'Not set',
+                'major' => '',
+                'yearLevel' => '',
+                'section' => ''
+              ];
+              $studyLoadSubjects = [];
+              $studyLoadTotals = ['subjects' => 0, 'units' => 0];
+              $studyLoadStatus = [
+                'hasAssignment' => false,
+                'message' => ''
+              ];
+              $studentCourse = '';
+              $studentMajor = '';
+
               try {
-                $currentUserId = $_SESSION['user_id'] ?? null;
-                $currentUsername = $_SESSION['username'] ?? '';
-                $currentFullName = $_SESSION['full_name'] ?? '';
-                
-                $studentGrades = [];
-                
+                if ($conn && !$conn->connect_error) {
+                  $hasMajorColumn = false;
+                  try {
+                    $colStmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_assignments' AND COLUMN_NAME = 'major'");
+                    if ($colStmt) {
+                      $colStmt->execute();
+                      $colRes = $colStmt->get_result();
+                      $colRow = $colRes ? $colRes->fetch_assoc() : null;
+                      if ($colRow && (int)$colRow['cnt'] > 0) {
+                        $hasMajorColumn = true;
+                      }
+                      $colStmt->close();
+                    }
+                  } catch (Throwable $colEx) {
+                    $hasMajorColumn = false;
+                  }
+                  $assignmentColumns = 'year, section, department, payment, sanctions, owing_amount';
+                  if ($hasMajorColumn) {
+                    $assignmentColumns .= ', major';
+                  }
+
+                  $assignmentRow = null;
+                  $assignmentLookups = [];
+
+                  if (!empty($currentUserId)) {
+                    $assignmentLookups[] = ['sql' => 'user_id = ?', 'types' => 'i', 'params' => [$currentUserId]];
+                  }
+                  if (!empty($currentUsername)) {
+                    $assignmentLookups[] = ['sql' => 'username = ?', 'types' => 's', 'params' => [$currentUsername]];
+                  }
+                  if (!empty($currentFullName) && $currentFullName !== $currentUsername) {
+                    $assignmentLookups[] = ['sql' => 'username = ?', 'types' => 's', 'params' => [$currentFullName]];
+                  }
+                  if (!empty($currentUsername)) {
+                    $assignmentLookups[] = ['sql' => 'username LIKE ?', 'types' => 's', 'params' => ['%' . $currentUsername . '%']];
+                  }
+                  if (!empty($currentFullName)) {
+                    $assignmentLookups[] = ['sql' => 'username LIKE ?', 'types' => 's', 'params' => ['%' . $currentFullName . '%']];
+                  }
+
+                  foreach ($assignmentLookups as $attempt) {
+                    $stmtAssign = $conn->prepare("SELECT {$assignmentColumns} FROM user_assignments WHERE {$attempt['sql']} LIMIT 1");
+                    if ($stmtAssign) {
+                      $stmtAssign->bind_param($attempt['types'], ...$attempt['params']);
+                      $stmtAssign->execute();
+                      $resAssign = $stmtAssign->get_result();
+                      $assignmentRow = $resAssign ? $resAssign->fetch_assoc() : null;
+                      $stmtAssign->close();
+                    }
+                    if ($assignmentRow) {
+                      break;
+                    }
+                  }
+
+                  if ($assignmentRow) {
+                    $studyLoadStatus['hasAssignment'] = true;
+                    $studyLoadMeta['yearLevel'] = $assignmentRow['year'] ?? '';
+                    $studyLoadMeta['section'] = $assignmentRow['section'] ?? '';
+                    $rawCourse = strtoupper($assignmentRow['department'] ?? '');
+                    if ($rawCourse === 'BSEED') {
+                      $rawCourse = 'BSED';
+                    }
+                    if ($rawCourse !== '') {
+                      $studentCourse = $rawCourse;
+                      $studyLoadMeta['course'] = $studentCourse;
+                    }
+                    if ($hasMajorColumn) {
+                      $studentMajor = trim($assignmentRow['major'] ?? '');
+                      $studyLoadMeta['major'] = $studentMajor;
+                    }
+                  }
+
+                  $yearLevelNumeric = null;
+                  if ($studyLoadMeta['yearLevel'] !== '') {
+                    if (is_numeric($studyLoadMeta['yearLevel'])) {
+                      $yearLevelNumeric = (int)$studyLoadMeta['yearLevel'];
+                    } elseif (preg_match('/\d+/', $studyLoadMeta['yearLevel'], $matches)) {
+                      $yearLevelNumeric = (int)$matches[0];
+                    }
+                  }
+
+                  if ($studentCourse !== '' && $studyLoadMeta['section'] !== '' && $yearLevelNumeric !== null) {
+                    // Try multiple query strategies to find study load
+                    // Strategy 1: Exact match with major (if major is set)
+                    if ($studentMajor !== '') {
+                      $loadParams = [$studentCourse, $studentMajor, $yearLevelNumeric, $studyLoadMeta['section']];
+                      $loadTypes = 'ssis';
+                      $loadSql = "SELECT subject_code, subject_title, units, semester, teacher FROM study_load WHERE course = ? AND major = ? AND year_level = ? AND section = ? ORDER BY semester, subject_code";
+                      
+                      $stmtLoad = $conn->prepare($loadSql);
+                      if ($stmtLoad) {
+                        $stmtLoad->bind_param($loadTypes, ...$loadParams);
+                        $stmtLoad->execute();
+                        $resLoad = $stmtLoad->get_result();
+                        while ($rowLoad = $resLoad->fetch_assoc()) {
+                          $studyLoadSubjects[] = $rowLoad;
+                          $studyLoadTotals['subjects']++;
+                          $studyLoadTotals['units'] += (int)$rowLoad['units'];
+                        }
+                        $stmtLoad->close();
+                      }
+                    }
+
+                    // Strategy 2: Match with case-insensitive major (handle minor differences)
+                    if (empty($studyLoadSubjects) && $studentMajor !== '') {
+                      $stmtLoad = $conn->prepare("SELECT subject_code, subject_title, units, semester, teacher FROM study_load WHERE course = ? AND LOWER(TRIM(major)) = LOWER(TRIM(?)) AND year_level = ? AND section = ? ORDER BY semester, subject_code");
+                      if ($stmtLoad) {
+                        $stmtLoad->bind_param('ssis', $studentCourse, $studentMajor, $yearLevelNumeric, $studyLoadMeta['section']);
+                        $stmtLoad->execute();
+                        $resLoad = $stmtLoad->get_result();
+                        while ($rowLoad = $resLoad->fetch_assoc()) {
+                          $studyLoadSubjects[] = $rowLoad;
+                          $studyLoadTotals['subjects']++;
+                          $studyLoadTotals['units'] += (int)$rowLoad['units'];
+                        }
+                        $stmtLoad->close();
+                      }
+                    }
+
+                    // Strategy 3: Match without major (for courses that don't require major or if major isn't captured)
+                    if (empty($studyLoadSubjects)) {
+                      $stmtLoad = $conn->prepare("SELECT subject_code, subject_title, units, semester, teacher FROM study_load WHERE course = ? AND year_level = ? AND section = ? AND (major IS NULL OR TRIM(major) = '' OR LOWER(TRIM(major)) = 'general') ORDER BY semester, subject_code, updated_at DESC");
+                      if ($stmtLoad) {
+                        $stmtLoad->bind_param('sis', $studentCourse, $yearLevelNumeric, $studyLoadMeta['section']);
+                        $stmtLoad->execute();
+                        $resLoad = $stmtLoad->get_result();
+                        while ($rowLoad = $resLoad->fetch_assoc()) {
+                          $studyLoadSubjects[] = $rowLoad;
+                          $studyLoadTotals['subjects']++;
+                          $studyLoadTotals['units'] += (int)$rowLoad['units'];
+                        }
+                        $stmtLoad->close();
+                      }
+                    }
+                  } else {
+                    $studyLoadStatus['message'] = 'No year, section, or course assignment found. Please contact your administrator.';
+                  }
+                }
+              } catch (Throwable $studyLoadException) {
+                $studyLoadStatus['message'] = 'Unable to load study load information right now.';
+              }
+
+              try {
                 // Build comprehensive query to match student grades
                 $conditions = [];
                 $types = '';
@@ -924,6 +1090,114 @@ function formatOrdinal($number) {
               <?php
               endif;
               ?>
+              <div class="info-card study-load-card">
+                <div class="card-header-modern">
+                  <i class="bi bi-mortarboard-fill"></i>
+                  <h3>Study Load</h3>
+                </div>
+                <?php
+                  $yearLabel = 'Not assigned';
+                  if ($studyLoadMeta['yearLevel'] !== '') {
+                    $yearLabel = is_numeric($studyLoadMeta['yearLevel'])
+                      ? formatOrdinal((int)$studyLoadMeta['yearLevel']) . ' Year'
+                      : $studyLoadMeta['yearLevel'];
+                  }
+                  $sectionLabel = $studyLoadMeta['section'] !== '' ? $studyLoadMeta['section'] : 'Not assigned';
+                  $courseLabel = $studyLoadMeta['course'] !== 'Not set' ? $studyLoadMeta['course'] : 'Not set';
+                  $majorLabel = $studyLoadMeta['major'] !== '' ? $studyLoadMeta['major'] : 'Not set';
+                ?>
+                <div class="table-responsive study-load-table-wrapper">
+                  <table class="table table-bordered align-middle study-load-table">
+                    <tbody>
+                      <tr>
+                        <th colspan="5" class="text-center text-uppercase study-load-title">Study Load</th>
+                      </tr>
+                      <tr>
+                        <td colspan="5">
+                          <div class="row g-2">
+                            <div class="col-md-6">
+                              <strong>Student ID:</strong>
+                              <span><?php echo htmlspecialchars($studyLoadMeta['studentId']); ?></span>
+                            </div>
+                            <div class="col-md-6">
+                              <strong>Full Name:</strong>
+                              <span><?php echo htmlspecialchars($studyLoadMeta['fullName']); ?></span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="5">
+                          <div class="row g-2">
+                            <div class="col-md-3">
+                              <strong>Course:</strong>
+                              <span><?php echo htmlspecialchars($courseLabel); ?></span>
+                            </div>
+                            <div class="col-md-3">
+                              <strong>Major:</strong>
+                              <span><?php echo htmlspecialchars($majorLabel); ?></span>
+                            </div>
+                            <div class="col-md-3">
+                              <strong>Year Level:</strong>
+                              <span><?php echo htmlspecialchars($yearLabel); ?></span>
+                            </div>
+                            <div class="col-md-3">
+                              <strong>Section:</strong>
+                              <span><?php echo htmlspecialchars($sectionLabel); ?></span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th colspan="5" class="text-center study-load-subheader">Subject Enrolled</th>
+                      </tr>
+                      <tr>
+                        <th scope="col">Subject Code</th>
+                        <th scope="col">Subject Name</th>
+                        <th scope="col">Semester</th>
+                        <th scope="col" style="width: 110px;">Units</th>
+                        <th scope="col">Subject Teacher</th>
+                      </tr>
+                      <?php if (!empty($studyLoadSubjects)): ?>
+                        <?php foreach ($studyLoadSubjects as $subject): ?>
+                        <tr>
+                          <td><?php echo htmlspecialchars($subject['subject_code']); ?></td>
+                          <td><?php echo htmlspecialchars($subject['subject_title']); ?></td>
+                          <td><?php echo htmlspecialchars($subject['semester'] ?? '—'); ?></td>
+                          <td><?php echo isset($subject['units']) ? (int)$subject['units'] : 0; ?></td>
+                          <td>
+                            <?php if (!empty($subject['teacher'])): ?>
+                              <?php echo htmlspecialchars($subject['teacher']); ?>
+                            <?php else: ?>
+                              <span class="text-muted">TBA</span>
+                            <?php endif; ?>
+                          </td>
+                        </tr>
+                        <?php endforeach; ?>
+                      <?php else: ?>
+                        <tr>
+                          <td colspan="5" class="text-center text-muted">
+                            <?php echo $studyLoadStatus['hasAssignment'] ? 'No subjects have been assigned to your study load yet.' : 'Study load information is not available right now.'; ?>
+                          </td>
+                        </tr>
+                      <?php endif; ?>
+                      <tr class="study-load-total-row">
+                        <td colspan="3">
+                          <strong>Total Subjects:</strong>
+                          <span><?php echo $studyLoadTotals['subjects']; ?></span>
+                        </td>
+                        <td colspan="2">
+                          <strong>Total Units:</strong>
+                          <span><?php echo $studyLoadTotals['units']; ?></span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <?php if (!empty($studyLoadStatus['message'])): ?>
+                    <p class="text-warning small mb-0"><?php echo htmlspecialchars($studyLoadStatus['message']); ?></p>
+                  <?php endif; ?>
+                </div>
+              </div>
             </div>
           </div>
           <?php
@@ -940,11 +1214,31 @@ function formatOrdinal($number) {
               $annList = [];
               $filterYear = isset($_GET['year_filter']) ? trim($_GET['year_filter']) : '';
               $filterDept = isset($_GET['dept_filter']) ? trim($_GET['dept_filter']) : '';
+              $filterMajor = isset($_GET['major_filter']) ? trim($_GET['major_filter']) : '';
+              if ($filterDept === '' || !isset($departmentMajors[$filterDept])) {
+                $filterMajor = '';
+              }
+              $announcementHasMajor = false;
+              try {
+                $colCheck = $conn->query("SHOW COLUMNS FROM announcements LIKE 'major'");
+                if ($colCheck && $colCheck->num_rows > 0) {
+                  $announcementHasMajor = true;
+                } else {
+                  $conn->query("ALTER TABLE announcements ADD COLUMN major VARCHAR(50) DEFAULT NULL AFTER department");
+                  $announcementHasMajor = true;
+                }
+                if ($colCheck) { $colCheck->close(); }
+              } catch (Throwable $colErr) {
+                $announcementHasMajor = false;
+              }
+              $announcementSelectColumns = $announcementHasMajor
+                ? "id, title, content, year, department, major, date"
+                : "id, title, content, year, department, date";
 
               try {
                 require_once __DIR__ . '/../BackEnd/database/db.php';
                 $conn = Database::getInstance()->getConnection();
-                $annQ = $conn->query("SELECT id, title, content, year, department, date FROM announcements ORDER BY date DESC");
+                $annQ = $conn->query("SELECT $announcementSelectColumns FROM announcements ORDER BY date DESC");
               } catch (Throwable $ex) {
                 $annQ = false;
               }
@@ -959,13 +1253,21 @@ function formatOrdinal($number) {
               if (isset($annQ) && $annQ !== false) {
                 while ($a = $annQ->fetch_assoc()) {
                   if ($filterYear !== '' && isset($a['year']) && (string)$a['year'] !== $filterYear) continue;
-                  if ($filterDept !== '' && isset($a['department']) && $a['department'] !== $filterDept) continue;
+                  $deptValue = $a['department'] ?? '';
+                  if ($deptValue === 'BSEED') { $deptValue = 'BSED'; }
+                  if ($filterDept !== '' && $deptValue !== $filterDept) continue;
+                  if ($filterMajor !== '' && isset($a['major']) && $a['major'] !== $filterMajor) continue;
+                  $a['department'] = $deptValue;
                   $announcements[] = $a;
                 }
               } else {
                 foreach (array_reverse($annList) as $a) {
                   if ($filterYear !== '' && isset($a['year']) && (string)$a['year'] !== $filterYear) continue;
-                  if ($filterDept !== '' && isset($a['department']) && $a['department'] !== $filterDept) continue;
+                  $deptValue = $a['department'] ?? '';
+                  if ($deptValue === 'BSEED') { $deptValue = 'BSED'; }
+                  if ($filterDept !== '' && $deptValue !== $filterDept) continue;
+                  if ($filterMajor !== '' && isset($a['major']) && $a['major'] !== $filterMajor) continue;
+                  $a['department'] = $deptValue;
                   $announcements[] = $a;
                 }
               }
@@ -1000,9 +1302,24 @@ function formatOrdinal($number) {
                       <option value="">All Departments</option>
                       <option value="IT" <?php echo $filterDept==='IT'?'selected':'';?>>IT</option>
                       <option value="HM" <?php echo $filterDept==='HM'?'selected':'';?>>HM</option>
-                      <option value="BSEED" <?php echo $filterDept==='BSEED'?'selected':'';?>>BSEED</option>
+                      <option value="BSED" <?php echo $filterDept==='BSED'?'selected':'';?>>BSED</option>
                       <option value="BEED" <?php echo $filterDept==='BEED'?'selected':'';?>>BEED</option>
                       <option value="TOURISM" <?php echo $filterDept==='TOURISM'?'selected':'';?>>TOURISM</option>
+                    </select>
+                  </div>
+                  <div class="filter-group">
+                    <label for="major_filter" class="filter-label">
+                      <i class="bi bi-diagram-3"></i>
+                      Major
+                    </label>
+                    <?php $majorsForDept = ($filterDept !== '' && isset($departmentMajors[$filterDept])) ? $departmentMajors[$filterDept] : []; ?>
+                    <select id="major_filter" name="major_filter" class="filter-select" <?php echo empty($majorsForDept) ? 'disabled' : ''; ?>>
+                      <option value="">All Majors</option>
+                      <?php foreach ($majorsForDept as $majorOption): ?>
+                        <option value="<?php echo htmlspecialchars($majorOption); ?>" <?php echo $filterMajor === $majorOption ? 'selected' : ''; ?>>
+                          <?php echo htmlspecialchars($majorOption); ?>
+                        </option>
+                      <?php endforeach; ?>
                     </select>
                   </div>
                   <button type="submit" class="filter-btn">
@@ -1048,12 +1365,22 @@ function formatOrdinal($number) {
                             ?>
                           </span>
                         <?php endif; ?>
-                        <?php if (!empty($a['department'])): ?>
+                        <?php
+                          $deptLabel = $a['department'] ?? '';
+                          if ($deptLabel === 'BSEED') { $deptLabel = 'BSED'; }
+                        ?>
+                        <?php if (!empty($deptLabel)): ?>
                           <span class="announcement-badge">
                             <i class="bi bi-building"></i>
-                            <?php echo htmlspecialchars($a['department']); ?>
+                            <?php echo htmlspecialchars($deptLabel); ?>
                           </span>
                         <?php endif; ?>
+                      <?php if (!empty($a['major'])): ?>
+                        <span class="announcement-badge">
+                          <i class="bi bi-diagram-3"></i>
+                          <?php echo htmlspecialchars($a['major']); ?>
+                        </span>
+                      <?php endif; ?>
                       </div>
                     </div>
                   <?php endforeach; ?>

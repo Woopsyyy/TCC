@@ -82,8 +82,15 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
         error_log("Attempting login for user: " . $username);
         
         if ($auth->login($username, $password)) {
-            error_log("Login successful, redirecting to home");
-            header("Location: /TCC/public/home.php");
+            error_log("Login successful, redirecting based on role");
+            $userRole = $_SESSION['role'] ?? 'student';
+            if ($userRole === 'admin') {
+              header("Location: /TCC/public/admin_dashboard.php");
+            } elseif ($userRole === 'teacher') {
+              header("Location: /TCC/public/teachers.php");
+            } else {
+              header("Location: /TCC/public/home.php");
+            }
         } else {
             error_log("Login failed, redirecting back to login page");
             header("Location: /TCC/public/index.html?error=1");

@@ -150,6 +150,13 @@ $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
           ],
         ];
         $activeSpotlight = $heroSpotlights[$view] ?? $heroSpotlights['schedule'];
+$departmentMajors = [
+  'IT' => ['Computer Technology', 'Electronics'],
+  'BSED' => ['English', 'Physical Education', 'Math', 'Filipino', 'Social Science'],
+  'HM' => ['General'],
+  'BEED' => ['General'],
+  'TOURISM' => ['General']
+];
         ?>
         <section class="dashboard-hero">
           <div class="hero-content">
@@ -192,140 +199,227 @@ $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
         </section>
         <?php
         if ($view === 'schedule') {
+          $currentFullName = $_SESSION['full_name'] ?? '';
+          $currentUsername = $_SESSION['username'] ?? '';
+          $currentUserId = $_SESSION['user_id'] ?? null;
+          
+          // Handle toast notifications
+          $scheduleToastMessage = '';
+          $scheduleToastType = 'success';
+          if (isset($_GET['success'])) {
+            $scheduleToastMessage = match ($_GET['success']) {
+              'created' => 'Schedule created successfully!',
+              'updated' => 'Schedule updated successfully!',
+              'deleted' => 'Schedule deleted successfully!',
+              default => 'Schedule saved successfully!'
+            };
+          } elseif (isset($_GET['error'])) {
+            $scheduleToastType = 'error';
+            $scheduleToastMessage = match ($_GET['error']) {
+              'missing' => 'Please fill in all required fields.',
+              'invalid_id' => 'Invalid schedule ID.',
+              'db_error' => 'Database error occurred. Please try again.',
+              default => 'Unable to save schedule right now.'
+            };
+          }
+          
+          // Teachers can only view their schedule, not edit
+          $editScheduleRow = null;
+          
+          // Ensure schedules table has class_type column
+          try {
+            $colCheck = $conn->query("SHOW COLUMNS FROM schedules LIKE 'class_type'");
+            if ($colCheck && $colCheck->num_rows === 0) {
+              $conn->query("ALTER TABLE schedules ADD COLUMN class_type ENUM('day', 'night') DEFAULT 'day' AFTER building");
+            }
+            if ($colCheck) { $colCheck->close(); }
+          } catch (Throwable $th) {
+            // ignore
+          }
+          
+          // Get available sections
+          $availableSections = [];
+          $sectionsQuery = $conn->query("SELECT DISTINCT name FROM sections ORDER BY name");
+          if ($sectionsQuery) {
+            while ($row = $sectionsQuery->fetch_assoc()) {
+              $availableSections[] = $row['name'];
+            }
+          }
+          
+          // Get available buildings
+          $availableBuildings = [];
+          $buildingsQuery = $conn->query("SELECT name FROM buildings ORDER BY name");
+          if ($buildingsQuery) {
+            while ($row = $buildingsQuery->fetch_assoc()) {
+              $availableBuildings[] = $row['name'];
+            }
+          }
+          // Fallback to JSON
+          if (empty($availableBuildings)) {
+            $buildingsPath = __DIR__ . '/../database/buildings.json';
+            if (file_exists($buildingsPath)) {
+              $buildingsData = json_decode(file_get_contents($buildingsPath), true) ?: [];
+              $availableBuildings = array_keys($buildingsData);
+            }
+          }
+          
+          // Query schedules where instructor matches the teacher OR subject codes match teacher assignments
+          $schedules = [];
+          
+          // First, get all subject codes assigned to this teacher
+          $teacherSubjects = [];
+          $subjectQuery = $conn->prepare("SELECT subject_code FROM teacher_assignments WHERE teacher_name = ? OR teacher_name = ?");
+          if ($subjectQuery) {
+            $subjectQuery->bind_param('ss', $currentFullName, $currentUsername);
+            $subjectQuery->execute();
+            $subjectResult = $subjectQuery->get_result();
+            while ($subjectRow = $subjectResult->fetch_assoc()) {
+              $teacherSubjects[] = $subjectRow['subject_code'];
+            }
+            $subjectQuery->close();
+          }
+          
+          // Build query: schedules where instructor matches OR subject matches teacher's assigned subjects
+          // Use DISTINCT to avoid duplicates when a schedule matches multiple conditions
+          if (!empty($teacherSubjects)) {
+            $placeholders = str_repeat('?,', count($teacherSubjects) - 1) . '?';
+            $scheduleQuery = $conn->prepare("SELECT DISTINCT id, year, subject, day, time_start, time_end, room, section, building, class_type FROM schedules WHERE instructor = ? OR instructor = ? OR subject IN ($placeholders) ORDER BY FIELD(day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'), time_start");
+            if ($scheduleQuery) {
+              $params = array_merge([$currentFullName, $currentUsername], $teacherSubjects);
+              $types = str_repeat('s', count($params));
+              $scheduleQuery->bind_param($types, ...$params);
+              $scheduleQuery->execute();
+              $scheduleResult = $scheduleQuery->get_result();
+              while ($scheduleRow = $scheduleResult->fetch_assoc()) {
+                $schedules[] = $scheduleRow;
+              }
+              $scheduleQuery->close();
+            }
+          } else {
+            // Fallback: query by instructor name only
+            $scheduleQuery = $conn->prepare("SELECT DISTINCT id, year, subject, day, time_start, time_end, room, section, building, class_type FROM schedules WHERE instructor = ? OR instructor = ? ORDER BY FIELD(day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'), time_start");
+            if ($scheduleQuery) {
+              $scheduleQuery->bind_param('ss', $currentFullName, $currentUsername);
+              $scheduleQuery->execute();
+              $scheduleResult = $scheduleQuery->get_result();
+              while ($scheduleRow = $scheduleResult->fetch_assoc()) {
+                $schedules[] = $scheduleRow;
+              }
+              $scheduleQuery->close();
+            }
+          }
+          
+          // Additional deduplication by ID to ensure no duplicates (in case DISTINCT doesn't work as expected)
+          $uniqueSchedules = [];
+          $seenIds = [];
+          foreach ($schedules as $schedule) {
+            $scheduleId = $schedule['id'] ?? null;
+            if ($scheduleId && !in_array($scheduleId, $seenIds)) {
+              $seenIds[] = $scheduleId;
+              $uniqueSchedules[] = $schedule;
+            }
+          }
+          $schedules = $uniqueSchedules;
           ?>
           <div class="records-container">
             <div class="records-header">
-              <h2 class="records-title">My Schedule</h2>
-              <p class="records-subtitle">View your teaching schedule and class assignments</p>
+              <h2 class="records-title">
+                <i class="bi bi-calendar-week"></i> My Schedule
+              </h2>
+              <p class="records-subtitle">Manage your teaching schedule and class assignments</p>
             </div>
             
             <div class="records-main">
-              <?php
-              try {
-                $currentFullName = $_SESSION['full_name'] ?? '';
-                $currentUsername = $_SESSION['username'] ?? '';
-                
-                // Query schedules where instructor matches the teacher
-                $schedules = [];
-                $scheduleQuery = $conn->prepare("SELECT id, year, subject, day, time_start, time_end, room, section, building FROM schedules WHERE instructor = ? OR instructor = ? ORDER BY FIELD(day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'), time_start");
-                if ($scheduleQuery) {
-                  $scheduleQuery->bind_param('ss', $currentFullName, $currentUsername);
-                  $scheduleQuery->execute();
-                  $scheduleResult = $scheduleQuery->get_result();
-                  while ($scheduleRow = $scheduleResult->fetch_assoc()) {
-                    $schedules[] = $scheduleRow;
+              <?php if (!empty($scheduleToastMessage)): ?>
+                <div class="alert alert-<?php echo $scheduleToastType === 'error' ? 'danger' : 'success'; ?> alert-dismissible fade show" role="alert">
+                  <?php echo htmlspecialchars($scheduleToastMessage); ?>
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              <?php endif; ?>
+              
+              <?php if (empty($schedules)): ?>
+                <div class="info-card mt-3">
+                  <div class="card-header-modern">
+                    <i class="bi bi-calendar-x"></i>
+                    <h3>No Schedule Found</h3>
+                  </div>
+                  <p class="text-muted mb-0">You don't have any scheduled classes yet. Add one using the form above.</p>
+                </div>
+              <?php else: ?>
+                <?php
+                // Group schedules by day
+                $schedulesByDay = [];
+                foreach ($schedules as $schedule) {
+                  $day = $schedule['day'] ?? 'Unknown';
+                  if (!isset($schedulesByDay[$day])) {
+                    $schedulesByDay[$day] = [];
                   }
-                  $scheduleQuery->close();
+                  $schedulesByDay[$day][] = $schedule;
                 }
                 
-                if (empty($schedules)) {
+                // Sort days (Monday-Saturday only)
+                $teacherDayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                uksort($schedulesByDay, function($a, $b) use ($teacherDayOrder) {
+                  $posA = array_search($a, $teacherDayOrder);
+                  $posB = array_search($b, $teacherDayOrder);
+                  if ($posA === false) $posA = 999;
+                  if ($posB === false) $posB = 999;
+                  return $posA - $posB;
+                });
+                
+                foreach ($schedulesByDay as $day => $daySchedules) {
                   ?>
-                  <div class="info-card">
+                  <div class="info-card mt-3">
                     <div class="card-header-modern">
-                      <i class="bi bi-calendar-x"></i>
-                      <h3>No Schedule Found</h3>
+                      <i class="bi bi-calendar-day"></i>
+                      <h3><?php echo htmlspecialchars($day); ?></h3>
                     </div>
-                    <p class="text-muted mb-0">You don't have any scheduled classes yet. Please contact the administrator to set up your schedule.</p>
+                    <div class="table-responsive">
+                      <table class="table table-hover align-middle">
+                        <thead>
+                          <tr>
+                            <th>Subject</th>
+                            <th>Year</th>
+                            <th>Section</th>
+                            <th>Time</th>
+                            <th>Class Type</th>
+                            <th>Room</th>
+                            <th>Building</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <?php foreach ($daySchedules as $schedule): 
+                            $timeStart = date('g:i A', strtotime($schedule['time_start']));
+                            $timeEnd = date('g:i A', strtotime($schedule['time_end']));
+                            $timeRange = $timeStart . ' - ' . $timeEnd;
+                            $classType = $schedule['class_type'] ?? 'day';
+                          ?>
+                            <tr>
+                              <td><strong><?php echo htmlspecialchars($schedule['subject']); ?></strong></td>
+                              <td><?php echo htmlspecialchars($schedule['year'] ?? 'N/A'); ?></td>
+                              <td><?php echo htmlspecialchars($schedule['section'] ?? '—'); ?></td>
+                              <td><?php echo htmlspecialchars($timeRange); ?></td>
+                              <td>
+                                <span class="badge bg-<?php echo $classType === 'night' ? 'dark' : 'warning'; ?>">
+                                  <?php echo htmlspecialchars(ucfirst($classType)); ?>
+                                </span>
+                              </td>
+                              <td><?php echo htmlspecialchars($schedule['room'] ?? '—'); ?></td>
+                              <td><?php echo htmlspecialchars($schedule['building'] ?? '—'); ?></td>
+                              <td>
+                                <span class="text-muted">View Only</span>
+                              </td>
+                            </tr>
+                          <?php endforeach; ?>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                   <?php
-                } else {
-                  // Group schedules by day
-                  $schedulesByDay = [];
-                  foreach ($schedules as $schedule) {
-                    $day = $schedule['day'] ?? 'Unknown';
-                    if (!isset($schedulesByDay[$day])) {
-                      $schedulesByDay[$day] = [];
-                    }
-                    $schedulesByDay[$day][] = $schedule;
-                  }
-                  
-                  // Sort days according to dayOrder
-                  uksort($schedulesByDay, function($a, $b) use ($dayOrder) {
-                    $posA = array_search($a, $dayOrder);
-                    $posB = array_search($b, $dayOrder);
-                    if ($posA === false) $posA = 999;
-                    if ($posB === false) $posB = 999;
-                    return $posA - $posB;
-                  });
-                  
-                  foreach ($schedulesByDay as $day => $daySchedules) {
-                    ?>
-                    <div class="info-card">
-                      <div class="card-header-modern">
-                        <i class="bi bi-calendar-day"></i>
-                        <h3><?php echo htmlspecialchars($day); ?></h3>
-                      </div>
-                      <div class="grades-grid">
-                        <?php foreach ($daySchedules as $schedule): 
-                          $timeStart = date('g:i A', strtotime($schedule['time_start']));
-                          $timeEnd = date('g:i A', strtotime($schedule['time_end']));
-                          $timeRange = $timeStart . ' - ' . $timeEnd;
-                        ?>
-                          <div class="grade-card-modern">
-                            <div class="grade-card-header-modern">
-                              <div class="grade-subject-info">
-                                <h5 class="grade-subject-name"><?php echo htmlspecialchars($schedule['subject']); ?></h5>
-                                <p class="grade-instructor">
-                                  <i class="bi bi-clock"></i>
-                                  <span><?php echo htmlspecialchars($timeRange); ?></span>
-                                </p>
-                              </div>
-                            </div>
-                            <div class="grade-details-modern">
-                              <div class="grade-detail-item">
-                                <span class="grade-period">
-                                  <i class="bi bi-circle-fill"></i>
-                                  Year
-                                </span>
-                                <span class="grade-number"><?php echo htmlspecialchars($schedule['year'] ?? 'N/A'); ?></span>
-                              </div>
-                              <?php if (!empty($schedule['section'])): ?>
-                              <div class="grade-detail-item">
-                                <span class="grade-period">
-                                  <i class="bi bi-circle-fill"></i>
-                                  Section
-                                </span>
-                                <span class="grade-number"><?php echo htmlspecialchars($schedule['section']); ?></span>
-                              </div>
-                              <?php endif; ?>
-                              <?php if (!empty($schedule['room'])): ?>
-                              <div class="grade-detail-item">
-                                <span class="grade-period">
-                                  <i class="bi bi-circle-fill"></i>
-                                  Room
-                                </span>
-                                <span class="grade-number"><?php echo htmlspecialchars($schedule['room']); ?></span>
-                              </div>
-                              <?php endif; ?>
-                              <?php if (!empty($schedule['building'])): ?>
-                              <div class="grade-detail-item">
-                                <span class="grade-period">
-                                  <i class="bi bi-circle-fill"></i>
-                                  Building
-                                </span>
-                                <span class="grade-number"><?php echo htmlspecialchars($schedule['building']); ?></span>
-                              </div>
-                              <?php endif; ?>
-                            </div>
-                          </div>
-                        <?php endforeach; ?>
-                      </div>
-                    </div>
-                    <?php
-                  }
                 }
-              } catch (Throwable $ex) {
                 ?>
-                <div class="info-card">
-                  <div class="card-header-modern">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <h3>Error Loading Schedule</h3>
-                  </div>
-                  <p class="text-muted mb-0">Unable to load your schedule. Please try again later.</p>
-                </div>
-                <?php
-              }
-              ?>
+              <?php endif; ?>
             </div>
           </div>
           <?php
@@ -342,11 +436,32 @@ $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
               $annList = [];
               $filterYear = isset($_GET['year_filter']) ? trim($_GET['year_filter']) : '';
               $filterDept = isset($_GET['dept_filter']) ? trim($_GET['dept_filter']) : '';
+              $filterMajor = isset($_GET['major_filter']) ? trim($_GET['major_filter']) : '';
+              if ($filterDept === '' || !isset($departmentMajors[$filterDept])) {
+                $filterMajor = '';
+              }
+
+              $announcementHasMajor = false;
+              try {
+                $colCheck = $conn->query("SHOW COLUMNS FROM announcements LIKE 'major'");
+                if ($colCheck && $colCheck->num_rows > 0) {
+                  $announcementHasMajor = true;
+                } else {
+                  $conn->query("ALTER TABLE announcements ADD COLUMN major VARCHAR(50) DEFAULT NULL AFTER department");
+                  $announcementHasMajor = true;
+                }
+                if ($colCheck) { $colCheck->close(); }
+              } catch (Throwable $colErr) {
+                $announcementHasMajor = false;
+              }
+              $announcementSelectColumns = $announcementHasMajor
+                ? "id, title, content, year, department, major, date"
+                : "id, title, content, year, department, date";
 
               try {
                 require_once __DIR__ . '/../BackEnd/database/db.php';
                 $conn = Database::getInstance()->getConnection();
-                $annQ = $conn->query("SELECT id, title, content, year, department, date FROM announcements ORDER BY date DESC");
+                $annQ = $conn->query("SELECT $announcementSelectColumns FROM announcements ORDER BY date DESC");
               } catch (Throwable $ex) {
                 $annQ = false;
               }
@@ -361,13 +476,21 @@ $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
               if (isset($annQ) && $annQ !== false) {
                 while ($a = $annQ->fetch_assoc()) {
                   if ($filterYear !== '' && isset($a['year']) && (string)$a['year'] !== $filterYear) continue;
-                  if ($filterDept !== '' && isset($a['department']) && $a['department'] !== $filterDept) continue;
+                  $deptValue = $a['department'] ?? '';
+                  if ($deptValue === 'BSEED') { $deptValue = 'BSED'; }
+                  if ($filterDept !== '' && $deptValue !== $filterDept) continue;
+                  if ($filterMajor !== '' && isset($a['major']) && $a['major'] !== $filterMajor) continue;
+                  $a['department'] = $deptValue;
                   $announcements[] = $a;
                 }
               } else {
                 foreach (array_reverse($annList) as $a) {
                   if ($filterYear !== '' && isset($a['year']) && (string)$a['year'] !== $filterYear) continue;
-                  if ($filterDept !== '' && isset($a['department']) && $a['department'] !== $filterDept) continue;
+                  $deptValue = $a['department'] ?? '';
+                  if ($deptValue === 'BSEED') { $deptValue = 'BSED'; }
+                  if ($filterDept !== '' && $deptValue !== $filterDept) continue;
+                  if ($filterMajor !== '' && isset($a['major']) && $a['major'] !== $filterMajor) continue;
+                  $a['department'] = $deptValue;
                   $announcements[] = $a;
                 }
               }
@@ -402,9 +525,24 @@ $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
                       <option value="">All Departments</option>
                       <option value="IT" <?php echo $filterDept==='IT'?'selected':'';?>>IT</option>
                       <option value="HM" <?php echo $filterDept==='HM'?'selected':'';?>>HM</option>
-                      <option value="BSEED" <?php echo $filterDept==='BSEED'?'selected':'';?>>BSEED</option>
+                      <option value="BSED" <?php echo $filterDept==='BSED'?'selected':'';?>>BSED</option>
                       <option value="BEED" <?php echo $filterDept==='BEED'?'selected':'';?>>BEED</option>
                       <option value="TOURISM" <?php echo $filterDept==='TOURISM'?'selected':'';?>>TOURISM</option>
+                    </select>
+                  </div>
+                  <div class="filter-group">
+                    <label for="major_filter" class="filter-label">
+                      <i class="bi bi-diagram-3"></i>
+                      Major
+                    </label>
+                    <?php $majorsForDept = ($filterDept !== '' && isset($departmentMajors[$filterDept])) ? $departmentMajors[$filterDept] : []; ?>
+                    <select id="major_filter" name="major_filter" class="filter-select" <?php echo empty($majorsForDept) ? 'disabled' : ''; ?>>
+                      <option value="">All Majors</option>
+                      <?php foreach ($majorsForDept as $majorOption): ?>
+                        <option value="<?php echo htmlspecialchars($majorOption); ?>" <?php echo $filterMajor === $majorOption ? 'selected' : ''; ?>>
+                          <?php echo htmlspecialchars($majorOption); ?>
+                        </option>
+                      <?php endforeach; ?>
                     </select>
                   </div>
                   <button type="submit" class="filter-btn">
@@ -450,10 +588,20 @@ $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
                             ?>
                           </span>
                         <?php endif; ?>
-                        <?php if (!empty($a['department'])): ?>
+                        <?php
+                          $deptLabel = $a['department'] ?? '';
+                          if ($deptLabel === 'BSEED') { $deptLabel = 'BSED'; }
+                        ?>
+                        <?php if (!empty($deptLabel)): ?>
                           <span class="announcement-badge">
                             <i class="bi bi-building"></i>
-                            <?php echo htmlspecialchars($a['department']); ?>
+                            <?php echo htmlspecialchars($deptLabel); ?>
+                          </span>
+                        <?php endif; ?>
+                        <?php if (!empty($a['major'])): ?>
+                          <span class="announcement-badge">
+                            <i class="bi bi-diagram-3"></i>
+                            <?php echo htmlspecialchars($a['major']); ?>
                           </span>
                         <?php endif; ?>
                       </div>

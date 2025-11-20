@@ -22,7 +22,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'];
             
-            // Redirect based on role
+           
             switch($user['role']) {
                 case 'admin':
                     header("Location: ../public/admin_dashboard.php");

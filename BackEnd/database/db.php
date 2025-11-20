@@ -108,6 +108,13 @@ class Database {
                 error_log("student_grades table missing. Creating it...");
                 $this->createStudentGradesTable();
             }
+
+            // Ensure study_load_subjects table exists
+            $studyLoadCheck = $this->conn->query("SHOW TABLES LIKE 'study_load_subjects'");
+            if ($studyLoadCheck->num_rows == 0) {
+                error_log("study_load_subjects table missing. Creating it...");
+                $this->createStudyLoadTable();
+            }
         }
     }
     
@@ -138,6 +145,26 @@ class Database {
         }
     }
     
+    private function createStudyLoadTable() {
+        $query = "CREATE TABLE IF NOT EXISTS study_load_subjects (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            year_level VARCHAR(10) NOT NULL,
+            section VARCHAR(100) NOT NULL,
+            subject_code VARCHAR(50) NOT NULL,
+            subject_name VARCHAR(255) NOT NULL,
+            units DECIMAL(4,2) DEFAULT 0,
+            teacher VARCHAR(255) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_year_section_code (year_level, section, subject_code),
+            INDEX idx_year_section (year_level, section)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        if (!$this->conn->query($query)) {
+            error_log("Error creating study_load_subjects table: " . $this->conn->error);
+        }
+    }
+
     private function createAllTables() {
         $queries = [
             // Users table
@@ -275,6 +302,21 @@ class Database {
                 INDEX idx_year (year),
                 INDEX idx_subject (subject),
                 INDEX idx_day (day)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            // Study load subjects table
+            "CREATE TABLE IF NOT EXISTS study_load_subjects (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                year_level VARCHAR(10) NOT NULL,
+                section VARCHAR(100) NOT NULL,
+                subject_code VARCHAR(50) NOT NULL,
+                subject_name VARCHAR(255) NOT NULL,
+                units DECIMAL(4,2) DEFAULT 0,
+                teacher VARCHAR(255) DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_year_section_code (year_level, section, subject_code),
+                INDEX idx_year_section (year_level, section)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         ];
         

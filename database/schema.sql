@@ -24,6 +24,7 @@ CREATE TABLE announcements (
     content TEXT NOT NULL,
     year VARCHAR(10),
     department VARCHAR(50),
+    major VARCHAR(50),
     date DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -72,6 +73,7 @@ CREATE TABLE user_assignments (
     year VARCHAR(10) NOT NULL,
     section VARCHAR(100) NOT NULL,
     department VARCHAR(100) DEFAULT NULL,
+    major VARCHAR(100) DEFAULT NULL,
     payment ENUM('paid','owing') DEFAULT 'paid',
     sanctions TEXT DEFAULT NULL,
     owing_amount VARCHAR(64) DEFAULT NULL,
@@ -111,6 +113,39 @@ CREATE TABLE schedules (
     INDEX idx_year (year),
     INDEX idx_subject (subject),
     INDEX idx_day (day)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Subjects catalog table
+CREATE TABLE subjects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    subject_code VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    units INT DEFAULT 0,
+    course VARCHAR(20) NOT NULL,
+    major VARCHAR(50) NOT NULL,
+    year_level INT NOT NULL,
+    semester VARCHAR(20) NOT NULL DEFAULT 'First Semester',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_subject_code (subject_code),
+    INDEX idx_course_major_year (course, major, year_level, semester)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Study load assignments table
+CREATE TABLE study_load (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    course VARCHAR(20) NOT NULL,
+    major VARCHAR(50) NOT NULL,
+    year_level INT NOT NULL,
+    section VARCHAR(100) NOT NULL,
+    subject_code VARCHAR(50) NOT NULL,
+    subject_title VARCHAR(255) NOT NULL,
+    units INT DEFAULT 0,
+    semester VARCHAR(20) NOT NULL DEFAULT 'First Semester',
+    teacher VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_load (course, major, year_level, section, semester, subject_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Student grades table
